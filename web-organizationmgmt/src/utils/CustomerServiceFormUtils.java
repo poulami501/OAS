@@ -74,7 +74,7 @@ public class CustomerServiceFormUtils {
 		String invalidString = "";                        
 		if ( invalidCharFields.length() > 0 ) {
 
-			invalidString = invalidCharFields + ("<br/>" + Message.INVALID_NAME_CHARS_ORG);
+			invalidString = invalidCharFields + ("<br/>" + Message.INVALID_NAME_CHARS_STUDENT);
 
 		}																									   
 
@@ -103,12 +103,12 @@ public class CustomerServiceFormUtils {
 			studentLoginId = form.getStudentProfile()!= null && form.getStudentProfile().getStudentLoginId() != null ?  form.getStudentProfile().getStudentLoginId().trim() : null;
 			testAccessCode =  form.getTestAccessCode() != null? form.getTestAccessCode().trim() : null;
 
-			if (studentLoginId != null && ! WebUtils.validNameString(studentLoginId)) {
+			if (studentLoginId != null && ! WebUtils.validStudentNameString(studentLoginId)) {
 				invalidCharFieldCount += 1;            
 				invalidCharFields = buildErrorString(Message.STUDENT_LOGIN_ID, invalidCharFieldCount, invalidCharFields);       
 			}
 
-			if (testAccessCode != null && ! WebUtils.validNameString(testAccessCode)) {
+			if (testAccessCode != null && ! WebUtils.validStudentNameString(testAccessCode)) {
 				invalidCharFieldCount += 1;            
 				invalidCharFields = buildErrorString(Message.STUDENT_TEST_ACCESS_CODE, invalidCharFieldCount, invalidCharFields);       
 			}
@@ -118,7 +118,7 @@ public class CustomerServiceFormUtils {
 		if(form.getSelectedTab().equals("moduleTestSession") && form.getCurrentAction().equals("applySearch")) {
 
 			testAccessCode = form.getTestAccessCode()!=null ? form.getTestAccessCode().trim() : null;
-			if (testAccessCode != null && ! WebUtils.validNameString(testAccessCode)) {
+			if (testAccessCode != null && ! WebUtils.validStudentNameString(testAccessCode)) {
 				invalidCharFieldCount += 1;            
 				invalidCharFields = buildErrorString(Message.STUDENT_TEST_ACCESS_CODE, invalidCharFieldCount, invalidCharFields);       
 			}
