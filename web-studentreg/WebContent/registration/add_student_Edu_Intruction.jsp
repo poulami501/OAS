@@ -107,22 +107,98 @@
 				</select></td>
 			</tr>
 			<tr class="transparent">
-				<td class="transparent " width="210"><b>Skill Level(0-9) </b></td>
+				<td class="transparent " width="150"><span class="asterisk">*</span>&nbsp;<b>Skill Level</b></td>
 
 			</tr>
-
 			<tr class="transparent">
-				<td class="transparent-small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-				<select style="width: 280px">
-					<Option selected="true">Please Select</Option>
-					<Option>Technology</Option>
-					<Option>Speaking</Option>
-					<Option>Reading</Option>
-					<Option>Writing</Option>
-					<Option>Math</Option>
+			<td>
+				<table>
+					<tr>
+						<td class="transparent-small" width="100%">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Technology</td>
+						<td><select>
+							<Option>Please Select</Option>
+							<Option>0</Option>
+							<Option>1</Option>
+							<Option>2</Option>
+							<Option>3</Option>
+							<Option>4</Option>
+							<Option>5</Option>
+							<Option>6</Option>
+							<Option>7</Option>
+							<Option>8</Option>
+							<Option>9</Option>
+						</select></td>
+					</tr>
+					<tr>
+						<td class="transparent-small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Speaking</td>
+						<td><select>
+							<Option>Please Select</Option>
+							<Option>0</Option>
+							<Option>1</Option>
+							<Option>2</Option>
+							<Option>3</Option>
+							<Option>4</Option>
+							<Option>5</Option>
+							<Option>6</Option>
+							<Option>7</Option>
+							<Option>8</Option>
+							<Option>9</Option>
+						</select></td>
 
-				</select></td>
-			</tr>
+					</tr>
+					<tr class="transparent">
+						<td class="transparent-small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Reading</td>
+
+						<td><select style="float: right;">
+							<Option>Please Select</Option>
+							<Option>0</Option>
+							<Option>1</Option>
+							<Option>2</Option>
+							<Option>3</Option>
+							<Option>4</Option>
+							<Option>5</Option>
+							<Option>6</Option>
+							<Option>7</Option>
+							<Option>8</Option>
+							<Option>9</Option>
+						</select></td>
+
+					</tr>
+					<tr class="transparent">
+						<td class="transparent-small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Writing</td>
+						<td><select style="float: right;">
+							<Option>Please Select</Option>
+							<Option>0</Option>
+							<Option>1</Option>
+							<Option>2</Option>
+							<Option>3</Option>
+							<Option>4</Option>
+							<Option>5</Option>
+							<Option>6</Option>
+							<Option>7</Option>
+							<Option>8</Option>
+							<Option>9</Option>
+						</select></td>
+
+					</tr>
+					<tr class="transparent">
+						<td class="transparent-small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Math</td>
+						<td><select style="float: right;">
+							<Option>Please Select</Option>
+							<Option>0</Option>
+							<Option>1</Option>
+							<Option>2</Option>
+							<Option>3</Option>
+							<Option>4</Option>
+							<Option>5</Option>
+							<Option>6</Option>
+							<Option>7</Option>
+							<Option>8</Option>
+							<Option>9</Option>
+						</select></td>
+					</tr>
+				</table>
+			</td>
 		</table>
 		</td>
 		<!-- column 2 -->
