@@ -18,7 +18,7 @@
 		<td class="transparent-top" width="50%" valign="top">
 		<table class="transparent">
 			<tr class="transparent">
-				<td class="transparent" width="210"><b>Highest Year Of School Completed</b></td>
+				<td class="transparent" width="210"><span class="asterisk">*</span>&nbsp;<b>Highest Year Of School Completed</b></td>
 
 			</tr>
 			<tr class="transparent">
@@ -35,7 +35,7 @@
 			</tr>
 
 			<tr class="transparent">
-				<td class="transparent " width="210"><b>Highest Diploma Or Degree Earned </b></td>
+				<td class="transparent " width="210"><span class="asterisk">*</span>&nbsp;<b>Highest Diploma Or Degree Earned </b></td>
 
 			</tr>
 			<tr class="transparent">
@@ -52,7 +52,7 @@
 			</tr>
 
 			<tr class="transparent">
-				<td class="transparent " width="210"><b>Earned the above outside the U.S. </b></td>
+				<td class="transparent " width="210"><span class="asterisk">*</span>&nbsp;<b>Earned the above outside the U.S. </b></td>
 
 			</tr>
 			<tr class="transparent">
@@ -66,7 +66,7 @@
 		
 
 			<tr class="transparent">
-				<td class="transparent " width="210"><b>Class Number </b></td>
+				<td class="transparent " width="210"><span class="asterisk">*</span>&nbsp;<b>Class Number </b></td>
 
 			</tr>
 			<tr class="transparent">
@@ -74,7 +74,7 @@
 			</tr>
 
 			<tr class="transparent">
-				<td class="transparent " width="210"><b>Date of Entry into this Class </b></td>
+				<td class="transparent " width="210"><span class="asterisk">*</span>&nbsp;<b>Date of Entry into this Class </b></td>
 
 			</tr>
 			<tr class="transparent">
@@ -85,7 +85,7 @@
 
 			</tr>
 			<tr class="transparent">
-				<td class="transparent " width="210"><b>Instructional Level </b></td>
+				<td class="transparent " width="210"><span class="asterisk">*</span>&nbsp;<b>Instructional Level </b></td>
 
 			</tr>
 			<tr class="transparent">
@@ -206,7 +206,7 @@
 <td class="transparent-top" width="50%" valign="top">
 <table class="transparent">
     <tr class="transparent">
-        <td class="transparent-small" width="210"><b>Instructional Program </b></td>
+        <td class="transparent-small" width="210"><span class="asterisk">*</span>&nbsp;<b>Instructional Program </b></td>
     </tr>
     <tr class="transparent">
    
