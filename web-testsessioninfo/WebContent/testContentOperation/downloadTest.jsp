@@ -12,8 +12,8 @@
 <netui-data:declareBundle bundlePath="helpResources" name="help"/>
 
 <netui-template:template templatePage="/resources/jsp/oas_template.jsp">
-    <netui-template:setAttribute name="title" value="${bundle.web['findorg.window.title']}"/>
-    <netui-template:setAttribute name="helpLink" value="${bundle.help['help.topic.findOrganization']}"/>
+    <netui-template:setAttribute name="title" value="${bundle.web['loadTest.window.title']}"/>
+    <netui-template:setAttribute name="helpLink" value="${bundle.help['help.topic.loadTestSelectTests']}"/>
 <netui-template:section name="bodySection">
  
 <!-- ********************************************************************************************************************* -->
