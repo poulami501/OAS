@@ -1,21 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>web-studentreg</name>
+	<name>web-dataexportprocessor</name>
 	<comment></comment>
 	<projects>
-		<project>dep-weblib-webutils</project>
-		<project>dep-testadmin-ctrl</project>
-		<project>dep-weblib-taglib</project>
-		<project>dep-base-ctrl</project>
-		<project>dep-studentmgmt-ctrl</project>
-		<project>dep-licensing-ctrl</project>
 	</projects>
 	<buildSpec>
-		<buildCommand>
-			<name>com.bea.workshop.controls.core.AssemblyPublishCleaner</name>
-			<arguments>
-			</arguments>
-		</buildCommand>
 		<buildCommand>
 			<name>org.eclipse.jdt.core.javabuilder</name>
 			<arguments>
