@@ -6,9 +6,12 @@
 <lb:bundle baseName="immediateReportingResources" />
 <% 
 	String studentIdLabelNameorg = (String)request.getAttribute("studentIdLabelName");
+	Integer productId = Integer.parseInt(request.getAttribute("productId").toString());
 %>
 <input type="hidden" id="stuCountId" value=<lb:label key="immediate.report.msg.orgStuCount" prefix="'" suffix="'"/>/>
 <input type="hidden" id="studentIdLabelName"  value = '<%=studentIdLabelNameorg %>' />
+<input type="hidden" id="productId" value='<%=productId %>' />
+
 <input type="hidden" id="imdRptStuListGridCaption" value=<lb:label key="immediate.report.stu.grid.caption" prefix="'" suffix="'"/>/>
 <input type="hidden" id="stuGrdLoginId" value=<lb:label key="immediate.report.stuGrig.loginId" prefix="'" suffix="'"/>/>
 <input type="hidden" id="stuGrdStdName" value=<lb:label key="immediate.report.stuGrig.stdName" prefix="'" suffix="'"/>/>
