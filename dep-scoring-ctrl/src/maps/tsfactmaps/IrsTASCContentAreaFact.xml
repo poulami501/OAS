@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE sqlMap PUBLIC "-//iBATIS.com//DTD SQL Map 2.0//EN" "http://www.ibatis.com/dtd/sql-map-2.dtd">
+<sqlMap namespace="IrsTASCContentAreaFact">
+
+<select id="TSfindByCAStudentSession" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData" resultClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData">
+SELECT 
+        FACTID as factid,
+        CONTENT_AREAID as contentAreaid,
+        STUDENTID as studentid,        
+        FORMID as formid,
+        SESSIONID as sessionid,
+        GRADEID	as gradeid,
+        LEVELID	as levelid,
+        NRS_LEVELID as nrsLevelid,
+        ORG_NODEID	as orgNodeid,
+        ASSESSMENTID as assessmentid,
+        PROGRAMID as programid,	
+        CURRENT_RESULTID as currentResultid,
+        SUBJECTID as subjectid,
+        SCALE_SCORE as scaleScore,
+        GRADE_EQUIVALENT as gradeEquivalent,
+        NORMAL_CURVE_EQUIVALENT as normalCurveEquivalent,
+        PERCENTAGE_MASTERY as percentageMastery,
+        NATIONAL_PERCENTILE as nationalPercentile,
+        PROFICIENCY_LEVEL as proficiencyLevel,
+        NATIONAL_STANINE as nationalStanine,
+        POINTS_ATTEMPTED as pointsAttempted,
+        PERCENT_OBTAINED as percentObtained,
+        POINTS_OBTAINED as pointsObtained,
+        TEST_COMPLETION_TIMESTAMP as testCompletionTimestamp
+FROM
+        TASC_CONTENT_AREA_FACT  
+WHERE 
+			STUDENTID = #studentid:NUMERIC#
+		AND
+			SESSIONID =  #sessionid:NUMERIC#
+		AND		
+	        CONTENT_AREAID = #contentAreaid:NUMERIC#
+</select> 
+
+<insert id="TSinsertTASCContentAreaFact" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData">
+
+        INSERT INTO
+            TASC_CONTENT_AREA_FACT
+                (
+                FACTID,
+	    	    CONTENT_AREAID,
+    	    	STUDENTID,        
+		        FORMID,
+		        SESSIONID,
+		        GRADEID,
+		        LEVELID,
+		        ORG_NODEID,
+		        ASSESSMENTID,
+		        PROGRAMID,	
+		        CURRENT_RESULTID,
+		        SUBJECTID,
+		        SCALE_SCORE,
+		        NORMAL_CURVE_EQUIVALENT,
+		        NATIONAL_PERCENTILE,
+		        PROFICIENCY_LEVEL,
+		        SCALE_SCORE_RANGE,
+		        POINTS_ATTEMPTED,
+		        PERCENT_OBTAINED,
+		        POINTS_OBTAINED,
+                POINTS_POSSIBLE,
+		        TEST_COMPLETION_TIMESTAMP,
+		        SCORING_STATUS
+                )
+        VALUES
+                (
+ 				#factid:NUMERIC#,
+		        #contentAreaid:NUMERIC#,
+		        #studentid:NUMERIC#,        
+		        #formid:NUMERIC#,
+		        #sessionid:NUMERIC#,
+		        #gradeid:NUMERIC#,
+		        #levelid:NUMERIC#,
+		        #orgNodeid:NUMERIC#,
+		        #assessmentid:NUMERIC#,
+		        #programid:NUMERIC#,	
+		        decode(
+                    sign( 
+                        NVL(to_number(
+                            TO_CHAR(
+                                to_timestamp(
+                                    to_char((select max(test_completion_timestamp) from tasc_content_area_fact
+                                        where sessionid != #sessionid:NUMERIC#
+                                        and studentid = #studentid:NUMERIC#
+                                        and assessmentid = #assessmentid:NUMERIC#
+                                        and current_Resultid = 1
+                                        and content_areaid = #contentAreaid:NUMERIC#
+                                    ), 'MM/DD/YYYY HH24:MI:SS'), 'MM/DD/YYYY HH24:MI:SS'
+                                ), 
+                                'YYYYMMDDHH24MISSFF3'
+                            )
+                        ), 0) -
+                        to_number(
+                            TO_CHAR(
+                                to_timestamp(
+                                    #testCompletionTimestamp:TIMESTAMP#
+                                ), 
+                                'YYYYMMDDHH24MISSFF3'
+                            )
+                        )
+                    ), 
+                    -1, 
+                    1,
+                    0,
+                    2,
+                    1,
+                    2,
+                    1
+                ),
+		        #subjectid:NUMERIC#,
+		        #scaleScore:NUMERIC#,
+		        #normalCurveEquivalent:NUMERIC#,
+		        #nationalPercentile:NUMERIC#,
+		        #proficiencyLevel:NUMERIC#,
+		        #proficiencyRange:VARCHAR#,
+		        #pointsAttempted:NUMERIC#,
+		        #percentObtained:NUMERIC#,
+		        #pointsObtained:NUMERIC#,
+                #pointsPossible:NUMERIC#,
+		        #testCompletionTimestamp:TIMESTAMP#,
+		        #subtestScoringStatus:VARCHAR#
+                )        
+</insert>
+
+<select id="TSisTASCCAFactCurrent" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData" resultClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData">
+select decode(
+                    sign( 
+                        NVL(to_number(
+                            TO_CHAR(
+                                to_timestamp(
+                                    to_char((select max(test_completion_timestamp) from tasc_content_area_fact
+                                        where sessionid != #sessionid:NUMERIC#
+                                        and studentid = #studentid:NUMERIC#
+                                        and assessmentid = #assessmentid:NUMERIC#
+                                        and current_Resultid = 1
+                                        and content_areaid = #contentAreaid:NUMERIC#
+                                    ), 'MM/DD/YYYY HH24:MI:SS'), 'MM/DD/YYYY HH24:MI:SS'
+                                ), 
+                                'YYYYMMDDHH24MISSFF3'
+                            )
+                        ), 0) -
+                        to_number(
+                            TO_CHAR(
+                                to_timestamp(
+                                    #testCompletionTimestamp:TIMESTAMP#
+                                ), 
+                                'YYYYMMDDHH24MISSFF3'
+                            )
+                        )
+                    ), 
+                    -1, 
+                    1,
+                    0,
+                    2,
+                    1,
+                    2
+                ) as currentResultid from dual
+</select>
+
+<update id="TSupdateTASCContentAreaFact" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData">
+       
+        UPDATE
+                TABE_CONTENT_AREA_FACT
+        SET
+				FACTID = #factid:NUMERIC#,		
+		        FORMID = #formid:NUMERIC#,		
+		        GRADEID = #gradeid:NUMERIC#,		
+		        LEVELID	= #levelid:NUMERIC#,		
+		        NRS_LEVELID = #nrsLevelid:NUMERIC#,		
+		        ORG_NODEID = #orgNodeid:NUMERIC#,		
+		        ASSESSMENTID = #assessmentid:NUMERIC#,		
+		        PROGRAMID = #programid:NUMERIC#,		
+		        CURRENT_RESULTID = #currentResultid:NUMERIC#,				       
+		        SUBJECTID = #subjectid:NUMERIC#,		
+		        SCALE_SCORE = #scaleScore:NUMERIC#,		
+		        NORMAL_CURVE_EQUIVALENT = #normalCurveEquivalent:NUMERIC#,		
+		        NATIONAL_PERCENTILE = #nationalPercentile:NUMERIC#,
+		        PROFICIENCY_LEVEL = #proficiencyLevel:NUMERIC#,	
+		        POINTS_ATTEMPTED = #pointsAttempted:NUMERIC#,		
+		        PERCENT_OBTAINED = #percentObtained:NUMERIC#,		
+		        POINTS_OBTAINED	 = #pointsObtained:NUMERIC#,		
+		        TEST_COMPLETION_TIMESTAMP = #testCompletionTimestamp:TIMESTAMP#		
+        WHERE 
+			STUDENTID = #studentid:NUMERIC#
+		AND
+			SESSIONID =  #sessionid:NUMERIC#
+		AND		
+	        CONTENT_AREAID = #contentAreaid:NUMERIC#
+</update>
+<update id="TSupdateTASCContentAreaFactCurrentResult" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData"> 
+        UPDATE
+                TASC_CONTENT_AREA_FACT fact
+        SET	
+		        CURRENT_RESULTID = #currentResultid:NUMERIC#	
+        WHERE 
+			STUDENTID = #studentid:NUMERIC#
+        AND
+            SESSIONID != #sessionid:NUMERIC#
+        AND
+			(content_areaID in (select content_AreaID 
+                                from TASC_CONTENT_AREA_FACT 
+                                where sessionid = #sessionid:NUMERIC#
+                                and studentid = #studentid:NUMERIC#)
+             OR #currentResultid:NUMERIC# = 1)
+        AND
+            test_completion_timestamp = (select max(test_completion_timestamp) from tabe_content_area_fact
+                        where sessionid != #sessionid:NUMERIC#
+                        and studentid = #studentid:NUMERIC#
+                        and content_areaid = fact.content_areaid
+                        and assessmentid = fact.assessmentid
+                        and test_completion_timestamp &lt;= decode(#currentResultid:NUMERIC#, 1, sysdate, #testCompletionTimestamp:TIMESTAMP#))        
+</update>
+<delete id="TSdeleteByContentAreaFactId" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCContentAreaFactData">
+
+	DELETE FROM
+			TASC_CONTENT_AREA_FACT
+	WHERE 
+			STUDENTID = #studentid:NUMERIC#
+		AND
+			SESSIONID =  #sessionid:NUMERIC#
+		AND		
+	        CONTENT_AREAID = #contentAreaid:NUMERIC#
+</delete>
+</sqlMap>

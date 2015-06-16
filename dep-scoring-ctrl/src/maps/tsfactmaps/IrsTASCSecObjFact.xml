@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE sqlMap PUBLIC "-//iBATIS.com//DTD SQL Map 2.0//EN" "http://www.ibatis.com/dtd/sql-map-2.dtd">
+<sqlMap namespace="IrsTASCSecObjFact">
+
+<select id="TSfindBySecObjStudentSession" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCSecObjFactData" resultClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCSecObjFactData">
+SELECT 
+        FACTID as factid,
+        SEC_OBJID as secObjid,
+        STUDENTID as studentid,        
+        FORMID as formid,
+        SESSIONID as sessionid,
+        GRADEID	as gradeid,
+        LEVELID	as levelid,
+        ORG_NODEID	as orgNodeid,
+        ASSESSMENTID as assessmentid,
+        PROGRAMID as programid,	
+        CURRENT_RESULTID as currentResultid,
+        MASTERY_LEVELID as masteryLevelid,
+        POINTS_ATTEMPTED as pointsAttempted,
+        PERCENT_OBTAINED as percentObtained,
+        POINTS_OBTAINED as pointsObtained,
+        TEST_COMPLETION_TIMESTAMP as testCompletionTimestamp,
+        POINTS_POSSIBLE as pointsPossible
+FROM
+        TASC_SEC_OBJ_FACT  
+WHERE 
+			STUDENTID = #studentid:NUMERIC#
+		AND
+			SESSIONID =  #sessionid:NUMERIC#
+		AND		
+	        SEC_OBJID = #secObjid:NUMERIC#
+</select> 
+
+<insert id="TSinsertTASCSecObjFact" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCSecObjFactData">
+
+        INSERT INTO
+            TASC_SEC_OBJ_FACT
+                (
+                FACTID,
+		        SEC_OBJID,
+        		STUDENTID,        
+		        FORMID,
+		        SESSIONID,
+		        GRADEID,
+		        LEVELID,
+		        ORG_NODEID,
+		        ASSESSMENTID,
+		        PROGRAMID,	
+		        CURRENT_RESULTID,
+        		MASTERY_LEVELID,
+		        POINTS_ATTEMPTED,
+		        PERCENT_OBTAINED,
+		        POINTS_OBTAINED,
+        		TEST_COMPLETION_TIMESTAMP,
+		        POINTS_POSSIBLE,
+		        SCORING_STATUS,
+		        SCALE_SCORE,
+		        CONDITION_CODE,
+		        SCALE_SCORE_RANGE
+                )
+        VALUES
+                (
+                #factid:NUMERIC#,
+                #secObjid:NUMERIC#,
+                #studentid:NUMERIC#,
+                #formid:NUMERIC#,
+                #sessionid:NUMERIC#,
+                #gradeid:NUMERIC#,
+                #levelid:NUMERIC#,
+                #orgNodeid:NUMERIC#,
+                #assessmentid:NUMERIC#,
+                #programid:NUMERIC#,
+                decode(
+                    sign( 
+                        NVL(to_number(
+                            TO_CHAR(
+                                to_timestamp(
+                                    to_char((select max(test_completion_timestamp) from tasc_sec_obj_fact fact, 
+                                        sec_obj_dim secdim, prim_obj_dim primdim, content_area_dim condim
+                                        where fact.sessionid != #sessionid:NUMERIC#
+                                        and fact.studentid = #studentid:NUMERIC#
+                                        and fact.assessmentid = #assessmentid:NUMERIC#
+                                        and fact.current_Resultid = 1
+                                        and fact.sec_objid = secdim.sec_objid
+                                        and secdim.prim_objid = primdim.prim_objid
+                                        and primdim.content_Areaid = condim.content_areaid
+                                        and (#subtestName:VARCHAR# = 'TABE ' || condim.name OR (#subtestName:VARCHAR# = 'TABE Mathematics Computation' and condim.name = 'Math Computation'))
+                                    ), 'MM/DD/YYYY HH24:MI:SS'), 'MM/DD/YYYY HH24:MI:SS'
+                                ), 
+                                'YYYYMMDDHH24MISSFF3'
+                            )
+                        ), 0) -
+                        to_number(
+                            TO_CHAR(
+                                to_timestamp(
+                                    #testCompletionTimestamp:TIMESTAMP#
+                                ), 
+                                'YYYYMMDDHH24MISSFF3'
+                            )
+                        )
+                    ), 
+                    -1, 
+                    1,
+                    0,
+                    2,
+                    1,
+                    2,
+                    1
+                ),
+                #masteryLevelid:NUMERIC#,
+                #pointsAttempted:NUMERIC#,
+                #percentObtained:NUMERIC#,
+                #pointsObtained:NUMERIC#,
+                #testCompletionTimestamp:TIMESTAMP#,
+                #pointsPossible:NUMERIC#,
+                #objectiveScoringStatus:VARCHAR#,
+                #scaleScore:NUMERIC#,
+                #conditionCode:VARCHAR#,
+                #scaleScoreRangeForMasteryLevel:VARCHAR#
+                )        
+</insert>
+<update id="TSupdateTASCSecObjFact" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCSecObjFactData">
+       
+        UPDATE
+                TASC_SEC_OBJ_FACT
+        SET
+				FACTID = #factid:NUMERIC#,	
+	    	    FORMID = #formid:NUMERIC#,	
+		        GRADEID = #gradeid:NUMERIC#,	
+		        LEVELID = #levelid:NUMERIC#,	
+		        ORG_NODEID = #orgNodeid:NUMERIC#,	
+		        ASSESSMENTID = #assessmentid:NUMERIC#,	
+		        PROGRAMID = #programid:NUMERIC#,	
+		        CURRENT_RESULTID = #currentResultid:NUMERIC#,	
+				MASTERY_LEVELID = #masteryLevelid:NUMERIC#,	
+		        POINTS_ATTEMPTED = #pointsAttempted:NUMERIC#,	
+		        PERCENT_OBTAINED = #percentObtained:NUMERIC#,	
+		        POINTS_OBTAINED = #pointsObtained:NUMERIC#,	
+				TEST_COMPLETION_TIMESTAMP = #testCompletionTimestamp:TIMESTAMP#,	
+		        POINTS_POSSIBLE = #pointsPossible:NUMERIC#	
+        WHERE 
+			STUDENTID = #studentid:NUMERIC#
+		AND
+			SESSIONID =  #sessionid:NUMERIC#
+		AND		
+	        SEC_OBJID = #secObjid:NUMERIC#
+</update>
+<update id="TSupdateTASCSecObjFactCurrentResult" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCSecObjFactData">
+       
+        UPDATE
+                TASC_SEC_OBJ_FACT fact
+        SET	
+		        CURRENT_RESULTID = #currentResultid:NUMERIC#	
+        WHERE 
+			STUDENTID = #studentid:NUMERIC#
+        AND
+            SESSIONID != #sessionid:NUMERIC#
+        AND
+			(sec_objID in (select currsecdim.sec_objID 
+                                from TASC_sec_obj_FACT secfact, 
+                                sec_obj_dim secdim, prim_obj_dim primdim, content_Area_dim condim,
+                                prim_obj_dim currprimdim, sec_obj_dim currsecdim
+                                where secfact.sessionid = #sessionid:NUMERIC#
+                                and secfact.studentid = #studentid:NUMERIC#
+                                and secdim.sec_objid = secfact.sec_objid
+                                and primdim.prim_objid = secdim.prim_objid
+                                and condim.content_Areaid = primdim.content_areaid
+                                and currprimdim.content_areaid = condim.content_areaid
+                                and currsecdim.prim_objid = currprimdim.prim_objid
+                        )
+            OR #currentResultid:NUMERIC# = 1)
+        AND
+            test_completion_timestamp = (select max(test_completion_timestamp) from tasc_sec_obj_fact
+                        where sessionid != #sessionid:NUMERIC#
+                        and studentid = #studentid:NUMERIC#
+                        and assessmentid = fact.assessmentid
+                        and test_completion_timestamp &lt;= decode(#currentResultid:NUMERIC#, 1, sysdate, #testCompletionTimestamp:TIMESTAMP#))        
+</update>
+
+<delete id="TSdeleteBySecObjFactId" parameterClass="com.ctb.lexington.db.irsdata.irstsdata.IrsTASCSecObjFactData">
+
+	DELETE FROM
+			TASC_SEC_OBJ_FACT
+	WHERE 
+			STUDENTID = #studentid:NUMERIC#
+		AND
+			SESSIONID =  #sessionid:NUMERIC#
+		AND		
+	        SEC_OBJID = #secObjid:NUMERIC#
+</delete>
+</sqlMap>

@@ -1,0 +1,3206 @@
+package com.ctb.control.testAdmin; 
+
+import java.io.IOException;
+import java.io.Reader;
+import java.sql.Clob;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.text.CharacterIterator;
+import java.text.StringCharacterIterator;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ResourceBundle;
+
+import javax.naming.InitialContext;
+
+import org.apache.beehive.controls.api.bean.ControlImplementation;
+
+import weblogic.logging.NonCatalogLogger;
+
+import com.ctb.bean.request.FilterParams;
+import com.ctb.bean.request.PageParams;
+import com.ctb.bean.request.SortParams;
+import com.ctb.bean.request.FilterParams.FilterParam;
+import com.ctb.bean.request.FilterParams.FilterType;
+import com.ctb.bean.testAdmin.ActiveSession;
+import com.ctb.bean.testAdmin.ActiveSessionData;
+import com.ctb.bean.testAdmin.ActiveTest;
+import com.ctb.bean.testAdmin.ActiveTestData;
+import com.ctb.bean.testAdmin.BroadcastMessageData;
+import com.ctb.bean.testAdmin.ClassHierarchy;
+import com.ctb.bean.testAdmin.Customer;
+import com.ctb.bean.testAdmin.CustomerConfig;
+import com.ctb.bean.testAdmin.CustomerConfiguration;
+import com.ctb.bean.testAdmin.CustomerConfigurationValue;
+import com.ctb.bean.testAdmin.CustomerReport;
+import com.ctb.bean.testAdmin.CustomerReportData;
+import com.ctb.bean.testAdmin.CustomerSDSData;
+import com.ctb.bean.testAdmin.CustomerTestResource;
+import com.ctb.bean.testAdmin.CustomerTestResourceData;
+import com.ctb.bean.testAdmin.ItemResponseAndScore;
+import com.ctb.bean.testAdmin.ItemResponseData;
+import com.ctb.bean.testAdmin.Node;
+import com.ctb.bean.testAdmin.NodeData;
+import com.ctb.bean.testAdmin.OrganizationNode;
+import com.ctb.bean.testAdmin.Program;
+import com.ctb.bean.testAdmin.ProgramData;
+import com.ctb.bean.testAdmin.RosterElement;
+import com.ctb.bean.testAdmin.RosterElementData;
+import com.ctb.bean.testAdmin.ScoreDetails;
+import com.ctb.bean.testAdmin.SessionNode;
+import com.ctb.bean.testAdmin.SessionNodeData;
+import com.ctb.bean.testAdmin.StudentSessionStatus;
+import com.ctb.bean.testAdmin.StudentSessionStatusData;
+import com.ctb.bean.testAdmin.SubtestAccessCodeDetail;
+import com.ctb.bean.testAdmin.TestElement;
+import com.ctb.bean.testAdmin.TestElementData;
+import com.ctb.bean.testAdmin.TestProduct;
+import com.ctb.bean.testAdmin.TestSession;
+import com.ctb.bean.testAdmin.TestSessionData;
+import com.ctb.bean.testAdmin.User;
+import com.ctb.bean.testAdmin.UserNode;
+import com.ctb.bean.testAdmin.UserNodeData;
+import com.ctb.bean.testAdmin.UserParentProductResource;
+import com.ctb.bean.testAdmin.ScoreDetails.DeliveryUnitElement;
+import com.ctb.bean.testAdmin.ScoreDetails.OrderByItemSetOrder;
+import com.ctb.control.jms.QueueSend;
+import com.ctb.exception.CTBBusinessException;
+import com.ctb.exception.testAdmin.CustomerConfigurationDataNotFoundException;
+import com.ctb.exception.testAdmin.CustomerReportDataNotFoundException;
+import com.ctb.exception.testAdmin.OrgNodeDataNotFoundException;
+import com.ctb.exception.testAdmin.ProductDataNotFoundException;
+import com.ctb.exception.testAdmin.ProductResourceDataNotFound;
+import com.ctb.exception.testAdmin.RosterDataNotFoundException;
+import com.ctb.exception.testAdmin.StudentSessionStatusNotFoundException;
+import com.ctb.exception.testAdmin.TestAdminDataNotFoundException;
+import com.ctb.exception.testAdmin.TestElementDataNotFoundException;
+import com.ctb.exception.testAdmin.UserDataNotFoundException;
+import com.ctb.exception.testAdmin.UserProgramsNotFoundException;
+import com.ctb.exception.validation.ValidationException;
+import com.ctb.util.DESUtils;
+import com.ctb.util.DateUtils;
+import com.ctb.util.OASLogger;
+import com.ctb.util.SQLutils;
+import com.ctb.util.testAdmin.TestAdminStatusComputer;
+
+/**
+ * Platform control provides functions related to test session
+ * monitoring and status, including methods to obtain lists of
+ * test sessions of interest to a particular user.
+ * 
+ * @author Nate_Cohen, John_Wang
+ * @editor-info:code-gen control-interface="true"
+ */
+@ControlImplementation(isTransient=true)
+public class TestSessionStatusImpl implements TestSessionStatus
+{ 
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.Product product;
+
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.testAdmin.CustomerConfigurations customerConfiguration;
+
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.TestAdmin testAdmin;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.CustomerReportBridge reportBridge;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.BroadcastMessageLog message;
+
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.OrgNode orgNode;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.TestRoster roster;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.testAdmin.FormAssignment formAssignments;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.ItemSet itemSet;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.Users users;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.testAdmin.ADS ads;
+
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.validation.Validator validator;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.jms.ScoreStudent scorer;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.CustomerReportBridge customerReports;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.StudentItemSetStatus studentItemSetStatus;
+
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.UploadDataFile uploadDataFile;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.TestAdmin admins;
+    
+    /**
+     * @common:control
+     */
+    @org.apache.beehive.controls.api.bean.Control()
+    private com.ctb.control.db.ImmediateReportingIrs reports;
+    
+    static final long serialVersionUID = 1L;
+    private static final Map<String, String> irsItemFactTableMap = new HashMap<String, String>();
+    static{
+    	irsItemFactTableMap.put("TA", "TABE_ITEM_FACT");
+    	irsItemFactTableMap.put("TB", "TABE_ITEM_FACT");
+    	irsItemFactTableMap.put("TC", "TABE_ITEM_FACT");
+    	irsItemFactTableMap.put("TR", "TASC_ITEM_FACT");
+    	irsItemFactTableMap.put("TS", "TASC_ITEM_FACT");
+    	irsItemFactTableMap.put("TV", "TV_ITEM_FACT");
+    	irsItemFactTableMap.put("LL", "LASLINK_ITEM_FACT");
+    }
+    private static final int CTB_CUSTOMER_ID =2;
+    private static final String BLANK_VALUE = "N/A";
+    private static final String CUSTOMER_CONFIG_ALLOW_SUBTEST_INVALIDATION = "Allow_Subtest_Invalidation";
+    private static final String CUSTOMER_CONFIG_PARTIALLY ="Partially ";
+    public static final String CUSTOMER_CONFIG_UPLOAD_DOWNLOAD = "Allow_Upload_Download";
+    private String URL_ENCODING = "UTF-8";
+    private String jndiFactory = "";
+    private String jmsFactory = "";
+    private String jmsURL = "";
+    private String jmsQueue = "";
+    private String jmsPrincipal = "";
+    private String jmsCredentials = "";
+    
+   /**
+     * Retrieves the set of online reports available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @param orgNodeId - identifies the org node
+     * @param  programId - identifies the program
+     * @return CustomerReportData
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public CustomerReportData getTASCReportData(String userName,Integer orgNodeId, Integer programId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException {
+        try {
+            validator.validate(userName, null, "testAdmin.getCustomerReportData");
+            CustomerReportData crd = new CustomerReportData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            CustomerReport [] cr = reportBridge.getReportAssignmentsForUser(userName, programId, orgNodeId);
+            for (int i=0; i < cr.length; i++) {
+                String reportURL = cr[i].getReportUrl();
+                /*[IAA] Not needed for Prism Report(s)
+                String encryptedProgramId = DESUtils.encrypt(String.valueOf(programId), cr[i].getSystemKey());
+                String paramsPlainText = "NodeInstanceId="+orgNodeId
+                    +"&LevelId="+cr[i].getCategoryLevel()+"&Timestamp="+(new Date()).toString();
+                String encryptedParams = DESUtils.encrypt(paramsPlainText, cr[i].getCustomerKey());
+                reportURL = reportURL +"?sys="+encryptedProgramId+"&parms="+encryptedParams+"&RunReport=1&GetTestSessionWindow=1";
+                */
+                cr[i].setReportUrl(reportURL);
+            }
+            crd.setCustomerReports(cr, pageSize);
+            if(filter != null) crd.applyFiltering(filter);
+            if(sort != null) crd.applySorting(sort);
+            if(page != null) crd.applyPaging(page);
+            return crd;
+        } catch (SQLException se) {
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: getCustomerReportData: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+    }
+
+    /**
+     * Retrieves the set of online reports available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @param orgNodeId - identifies the org node
+     * @param  programId - identifies the program
+     * @return CustomerReportData
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public CustomerReportData getCustomerReportData(String userName,Integer orgNodeId, Integer programId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException {
+        try {
+            validator.validate(userName, null, "testAdmin.getCustomerReportData");
+            CustomerReportData crd = new CustomerReportData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+//            Integer [] topOrgNodeIds = orgNode.getTopOrgNodeIdsForUser(userName);
+//            Integer orgNodeId = topOrgNodeIds[0];
+            CustomerReport [] cr = reportBridge.getReportAssignmentsForUser(userName, programId, orgNodeId);
+            for (int i=0; i < cr.length; i++) {
+                String reportURL = cr[i].getReportUrl();
+//              String encryptedProgramId = DESUtils.encrypt(String.valueOf(cr[i].getActiveProgramId()), cr[i].getSystemKey());
+                String encryptedProgramId = DESUtils.encrypt(String.valueOf(programId), cr[i].getSystemKey());
+//              String paramsPlainText = "NodeInstanceId="+cr[i].getOrgNodeId()
+//                  +"&LevelId="+cr[i].getCategoryLevel()+"&Timestamp="+(new Date()).toString();
+                String paramsPlainText = "NodeInstanceId="+orgNodeId
+                    +"&LevelId="+cr[i].getCategoryLevel()+"&Timestamp="+(new Date()).toString();
+                String encryptedParams = DESUtils.encrypt(paramsPlainText, cr[i].getCustomerKey());
+                reportURL = reportURL +"?sys="+encryptedProgramId+"&parms="+encryptedParams+"&RunReport=1&GetTestSessionWindow=1";
+                cr[i].setReportUrl(reportURL);
+            }
+            crd.setCustomerReports(cr, pageSize);
+            if(filter != null) crd.applyFiltering(filter);
+            if(sort != null) crd.applySorting(sort);
+            if(page != null) crd.applyPaging(page);
+            return crd;
+        } catch (SQLException se) {
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: getCustomerReportData: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+    }
+    
+    /**
+     * Retrieves the set of online reports available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @param testRosterId - identifies the test roster
+     * @return String
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public String getIndividualReportUrl(String userName, Integer testRosterId) throws CTBBusinessException {
+        String reportURL = null;
+        try {
+            RosterElement re = roster.getRosterElement(testRosterId);
+            TestSession session = testAdmin.getTestAdminDetails(re.getTestAdminId());
+            
+            validator.validateAdmin(userName, re.getTestAdminId(), "testAdmin.getTestSessionDetails");
+
+            String orgNodeId = String.valueOf(session.getCreatorOrgNodeId());
+            String sessionId = String.valueOf(re.getTestAdminId());
+            String programId = String.valueOf(session.getProgramId());
+            String studentId = String.valueOf(re.getStudentId());
+            String studentName = re.getLastName() + ", " + re.getFirstName();
+            String testId = String.valueOf(session.getTestCatalogId());
+            String systemKey = null;
+            String customerKey = null;
+            String orgCategoryLevel = null;
+            
+            CustomerReport [] cr = reportBridge.getReportAssignmentsForProgram(session.getProgramId(), session.getCreatorOrgNodeId());
+            for (int i=0; i < cr.length; i++) {
+                String report = cr[i].getReportUrl();
+                if(cr[i].getReportName().indexOf("IndividualProfile") >= 0) {
+                    reportURL = report;
+                    systemKey = cr[i].getSystemKey();
+                    customerKey = cr[i].getCustomerKey();
+                    orgCategoryLevel = String.valueOf(cr[i].getCategoryLevel());
+                }
+            }
+            String encryptedProgramId = DESUtils.encrypt(String.valueOf(programId), systemKey);
+            String paramsPlainText = 
+                "Timestamp="+(new Date()).toString()+
+                "&LevelId="+orgCategoryLevel+
+                "&NodeInstanceId="+orgNodeId+
+                "&CurrentTestSessionId="+sessionId+
+                "&CurrentStudentId="+studentId+
+                "&CurrentStudentName="+studentName;
+            System.out.println("Non-encrypted URL = " + reportURL + "?TestID="+ testId + "&sys=" + paramsPlainText);
+            String encryptedParams = DESUtils.encrypt(paramsPlainText, customerKey);
+            reportURL = reportURL +"?TestID="+testId+"&sys="+encryptedProgramId+"&parms="+encryptedParams+"&RunReport=1";
+        } catch (SQLException se) {
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: getIndividualReportUrl: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+        return reportURL;
+    }
+    
+
+    /**
+     * Retrieves the set of online reports available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @param testRosterId - identifies the test roster
+     * @return String
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public String getIndividualReportUrlForSession(String userName, Integer testAdminId) throws CTBBusinessException {
+        String reportURL = null;
+        try {
+            TestSession session = testAdmin.getTestAdminDetails(testAdminId);
+            
+            validator.validateAdmin(userName, testAdminId, "testAdmin.getTestSessionDetails");
+
+            String orgNodeId = String.valueOf(session.getCreatorOrgNodeId());
+            String sessionId = String.valueOf(testAdminId);
+            String programId = String.valueOf(session.getProgramId());
+            String testId = String.valueOf(session.getTestCatalogId());
+            String systemKey = null;
+            String customerKey = null;
+            String orgCategoryLevel = null;
+            //** [IAA]: pass converted/timezone dates for IndividualProfile when called for a session
+            String adjustedCustomerStartDate = null;
+            String adjustedCustomerEndDate = null;
+            
+            CustomerReport [] cr = reportBridge.getReportAssignmentsForProgram(session.getProgramId(), session.getCreatorOrgNodeId());
+            for (int i=0; i < cr.length; i++) {
+                String report = cr[i].getReportUrl();
+                if(cr[i].getReportName().indexOf("IndividualProfile") >= 0) {
+                    reportURL = report;
+                    systemKey = cr[i].getSystemKey();
+                    customerKey = cr[i].getCustomerKey();
+                    orgCategoryLevel = String.valueOf(cr[i].getCategoryLevel());
+                    //**[IAA] Defect#70394: TABE BAUM: Individual Profie Report: Start Date and End Date of Test not matching with the one shown in Session (when report is run from TAS-UI).
+                    TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(session);
+                    java.text.DateFormat df = new java.text.SimpleDateFormat("MM/dd/yyyy");
+                    adjustedCustomerStartDate = df.format(session.getLoginStartDate());//session.getLoginStartDateString()
+                    adjustedCustomerEndDate = df.format(session.getLoginEndDate());
+                }
+            }
+            String encryptedProgramId = DESUtils.encrypt(String.valueOf(programId), systemKey);
+            String paramsPlainText = 
+                "Timestamp="+(new Date()).toString()+
+                "&LevelId="+orgCategoryLevel+
+                "&NodeInstanceId="+orgNodeId+
+                "&CurrentTestSessionId="+sessionId;
+            //**[IAA] Defect#70394
+            if (adjustedCustomerStartDate != null && adjustedCustomerEndDate != null)
+            {
+            	paramsPlainText += "&CustSessionStartDate="+adjustedCustomerStartDate;
+            	paramsPlainText += "&CustSessionEndDate="+adjustedCustomerEndDate;
+            }
+            System.out.println("Non-encrypted URL = " + reportURL + "?TestID="+ testId + "&sys=" + paramsPlainText);
+            String encryptedParams = DESUtils.encrypt(paramsPlainText, customerKey);
+            reportURL = reportURL +"?TestID="+testId+"&sys="+encryptedProgramId+"&parms="+encryptedParams+"&RunReport=1";
+        } catch (SQLException se) {
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: getIndividualReportUrl: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+        return reportURL;
+    }
+     
+    /**
+     * Retrieves the set of online reports available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @param testRosterIds - list of the test roster
+     * @return String
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public String getIndividualReportUrl(String userName, Integer[] testRosterIds, String fileName, String fileType, String email) throws CTBBusinessException {
+        String reportURL = null;
+        
+        try {
+        	Integer testRosterId = testRosterIds[0];
+            RosterElement re = roster.getRosterElement(testRosterId);
+            TestSession session = testAdmin.getTestAdminDetails(re.getTestAdminId());
+            String orgNodeId = String.valueOf(session.getCreatorOrgNodeId());
+            String sessionId = String.valueOf(re.getTestAdminId());
+            String programId = String.valueOf(session.getProgramId());
+            String testId = String.valueOf(session.getTestCatalogId());
+            String systemKey = null;
+            String customerKey = null;
+            String orgCategoryLevel = null;
+            String studentId = "";
+            fileType = "One file for all students".equals(fileType) ? "1" : "2";
+            
+        	for (int i=0 ; i<testRosterIds.length ; i++) {
+            	testRosterId = testRosterIds[i];
+                re = roster.getRosterElement(testRosterId);
+	            studentId += String.valueOf(re.getStudentId());
+	            if (i<testRosterIds.length-1) {
+	            	studentId += ",";
+	            }
+        	}            
+        	
+            CustomerReport [] cr = reportBridge.getReportAssignmentsForProgram(session.getProgramId(), session.getCreatorOrgNodeId());
+            for (int i=0; i < cr.length; i++) {
+                if(cr[i].getReportName().indexOf("IndividualProfile") >= 0) {
+                    systemKey = cr[i].getSystemKey();
+                    customerKey = cr[i].getCustomerKey();
+                    orgCategoryLevel = String.valueOf(cr[i].getCategoryLevel());
+                    break;
+                }
+            }
+            
+            CustomerReport crOpenAPI = reportBridge.getReportOpenAPI("ReportService");
+            reportURL = crOpenAPI.getReportUrl();
+            
+            String encryptedProgramId = DESUtils.encrypt(String.valueOf(programId), systemKey);
+            String paramsPlainText = 
+                "Timestamp="+(new Date()).toString()+
+                "&FileName="+fileName+
+                "&FileType="+fileType+
+                "&Email="+email+
+                "&LevelId="+orgCategoryLevel+
+                "&NodeInstanceId="+orgNodeId+
+                "&CurrentTestSessionId="+sessionId+
+                "&CurrentStudentId="+studentId;
+            
+            //System.out.println("No encrypted URL: " + reportURL +"?TestID="+testId+"&sys="+encryptedProgramId+"&parms="+paramsPlainText+"&RunReport=1");
+            
+            String encryptedParams = DESUtils.encrypt(paramsPlainText, customerKey);
+            reportURL = reportURL +"?TestID="+testId+"&sys="+encryptedProgramId+"&parms="+encryptedParams+"&RunReport=1";
+             
+            
+        } catch (SQLException se) {
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: getIndividualReportUrl: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+        
+        System.out.println("ReportService URL: " + reportURL);
+        return reportURL;
+    }
+    
+    
+    /**
+     */
+    public String getReportParams(String userName) throws CTBBusinessException {
+    	String result = "";
+        try {
+            User user = users.getUserDetails(userName);
+            Integer [] topOrgNodeIds = orgNode.getTopOrgNodeIdsForUser(userName);
+            Integer orgNodeId = topOrgNodeIds[0];
+            ProgramData pd = getProgramsForUser(userName, null, null, null);
+        	Program[] pgs = pd.getPrograms();
+        	Program pg = pgs[0];
+        	Integer programId = pg.getProgramId();
+        	
+            String systemKey = null;
+            String customerKey = null;
+            String orgCategoryLevel = null;
+        	
+            CustomerReport [] cr = reportBridge.getReportAssignmentsForProgram(programId, orgNodeId);
+            for (int i=0; i < cr.length; i++) {
+                if(cr[i].getReportName().indexOf("IndividualProfile") >= 0) {
+                    systemKey = cr[i].getSystemKey();
+                    customerKey = cr[i].getCustomerKey();
+                    orgCategoryLevel = String.valueOf(cr[i].getCategoryLevel());
+                }
+            }
+            
+            String encryptedProgramId = DESUtils.encrypt(String.valueOf(programId), systemKey);
+            String paramsPlainText = 
+                "Timestamp="+(new Date()).toString()+
+                "&LevelId="+orgCategoryLevel+
+                "&NodeInstanceId="+orgNodeId;
+                       
+            String encryptedParams = DESUtils.encrypt(paramsPlainText, customerKey);
+            
+            result = encryptedProgramId + "|" + encryptedParams;
+        	
+        } catch (SQLException se) {
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: getCustomerReportData: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+        
+        return result;
+    }
+
+    /**
+     */
+    public String getReportOpenAPI_URL(String reportName) throws CTBBusinessException {
+    	String reportURL = "";
+        try {
+        	
+            CustomerReport crOpenAPI = reportBridge.getReportOpenAPI(reportName);
+            reportURL = crOpenAPI.getReportUrl();
+        	
+        } catch (Exception e) {}
+        
+        return reportURL;
+    }
+    
+    /**
+     * Retrieves the set of programs available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @return ProgramData
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public ProgramData getProgramsForUser(String userName, FilterParams filter, PageParams page, SortParams sort)throws CTBBusinessException{
+        validator.validate(userName, null, "getCustomerProgramsForOrg");
+        try{
+            ProgramData progsData = new ProgramData();
+            Program [] programs = reportBridge.getProgramsForUser(userName);
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            progsData.setPrograms(programs,pageSize) ;
+            if(filter != null) progsData.applyFiltering(filter);
+            if(sort != null) progsData.applySorting(sort);
+            if(page != null) progsData.applyPaging(page);
+            return progsData;
+        }catch(SQLException se){
+            UserProgramsNotFoundException upnf = new UserProgramsNotFoundException("TestSessionStatusImpl: getCustomerProgramsForOrg: " + se.getMessage());
+            upnf.setStackTrace(se.getStackTrace());
+            throw upnf;
+        }
+    }
+    /**
+     * Retrieves the no of reports  available to a user's customer
+     * @common:operation
+     * @param userName - identifies the user
+     * @param customerId - identifies the customer
+     * @return boolean value 
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public boolean userHasReports(String userName,Integer customerId) throws CTBBusinessException{
+        validator.validate(userName, customerId, "userHasReports");
+        try{            
+            Integer noOfReports = reportBridge.getCustomerReports(customerId);            
+            if(noOfReports.intValue() > 0){
+                 return true;
+            }
+            return false;
+        }catch(SQLException se){
+            CustomerReportDataNotFoundException tee = new CustomerReportDataNotFoundException("ScheduleTestImpl: userHasReports: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+    }
+
+    /**
+     * Retrieves a filtered, sorted, paged list of Customer SDS names and
+     * corresponding tokens for the provided user's customer.
+     * @param userName - identifies the user
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return CustomerSDSData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public CustomerSDSData getCustomerSDSListForUser(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getCustomerSDSListForUser");
+        try {
+            CustomerSDSData csd = new CustomerSDSData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            Integer customerId = users.getCustomerIdForName(userName);
+            csd.setCustomerSDSs(ads.getCustomerSDSList(customerId), pageSize);
+            if(filter != null) csd.applyFiltering(filter);
+            if(sort != null) csd.applySorting(sort);
+            if(page != null) csd.applyPaging(page);
+            return csd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getCustomerSDSListForUser: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;
+        }
+    }
+
+    /**
+     * Retrieves a filtered, sorted, paged list of test sessions to which the specified user
+     * is assigned as a proctor.
+     * @param userName - identifies the user
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestSessionData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestSessionData getTestSessionsForUser(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getTestSessionsForUser");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = testAdmin.getTestAdminsForUser(userName);
+            for(int i=0;i<sessions.length;i++) {
+                TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+            }
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForUser: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;
+        }
+    }
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of test sessions to which the specified user
+     * is assigned as a proctor.
+     * @param userName - identifies the user
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestSessionData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestSessionData getTestSessionsForUserHome(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getTestSessionsForUser");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = testAdmin.getTestSessionsForUserHome(userName);
+            for(int i=0;i<sessions.length;i++) {
+            	sessions[i].setCopyable(admins.checkCopyable(userName, sessions[i].getTestAdminId()));
+                TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+            }
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForUser: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;
+        }
+    }
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of test sessions to which the specified user is assigned as a proctor
+	 * @param userName - identifies the user
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestSessionData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestSessionData getProctorAssignmentsForUser(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getProctorAssignmentsForUser");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = testAdmin.getProctorAssignmentsForUser(userName);
+            for(int i=0;i<sessions.length;i++) {
+                TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+            }
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getProctorAssignmentsForUser: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;        
+        }
+    }
+    
+    /**
+     * Retrieves details for a particular test session
+     * @param userName - identifies the user
+     * @param testAdminId - identifies the test session of interest
+     * @return TestSessionData
+     * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestSessionData getTestSessionDetails(String userName, Integer testAdminId) throws CTBBusinessException
+    {
+    	
+      validator.validateAdmin(userName, testAdminId, "testAdmin.getTestSessionDetails");
+        try {
+            TestSession [] sessions = new TestSession[1];
+            sessions[0] = testAdmin.getTestAdminDetails(testAdminId);
+            if(sessions[0].getTestLevel() == null){
+            	sessions[0].setTestLevel(testAdmin.getTestCataLogLevelByTestAdmin(testAdminId));
+            }
+            sessions[0].setCopyable(admins.checkCopyable(userName, sessions[0].getTestAdminId()));
+            TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[0]);
+            TestSessionData tsd = new TestSessionData();
+            tsd.setTestSessions(sessions, null);
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionDetails: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae; 
+        }
+    }
+    
+    
+    /**
+     * Retrieves the list of currently active customer specific broadcast messages
+     * @param userName - identifies the user
+     * @return BroadcastMessageData
+     * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public BroadcastMessageData getBroadcastMessages(String userName) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "broadcastMessage.getBroadcastMessages");
+        try {
+           BroadcastMessageData bmd = new BroadcastMessageData();
+           Integer [] prodId = message.getFrameworkProductForUser(userName);
+           Integer pageSize = null;
+          String qString = "''";
+           
+           if (prodId != null && prodId.length > 0 ){
+        	   qString = SQLutils.convertArraytoString(prodId);
+           }
+          
+           bmd.setBroadcastMessages(message.getProductSpecificBroadcastMsg(qString), null);
+           return bmd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getBroadcastMessages: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+    
+    /**
+     * Retrieves the list of all currently active broadcast messages for account manager
+     * @param userName - identifies the user
+     * @return BroadcastMessageData
+     * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public BroadcastMessageData getBroadcastMessagesForActManager(String userName) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "broadcastMessage.getBroadcastMessages");
+        try {
+           BroadcastMessageData bmd = new BroadcastMessageData();
+           Integer pageSize = null;
+           bmd.setBroadcastMessages(message.getBroadcastMessages(), null);
+           return bmd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getBroadcastMessages: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of test sessions created at the specified org node
+	 * @param userName - identifies the user
+     * @param orgNodeId - identifies the org node
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestSessionData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestSessionData getTestSessionsForOrgNode(String userName, Integer orgNodeId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForOrgNode");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = testAdmin.getTestAdminsForOrgNode(orgNodeId);
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            sessions = tsd.getTestSessions();
+            for(int i=0;i<sessions.length;i++) {
+                if(sessions[i] != null) {
+                    TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                }
+            }
+            
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+    
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of test sessions created at the specified org node
+	 * @param userName - identifies the user
+     * @param orgNodeId - identifies the org node
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestSessionData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestSessionData getTestSessionsForOrgNode(String userName, Integer orgNodeId, FilterParams filter, PageParams page, SortParams sort,Integer userId) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForOrgNode");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = testAdmin.getTestAdminsForOrgNode(orgNodeId, userId);
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            sessions = tsd.getTestSessions();
+            for(int i=0;i<sessions.length;i++) {
+                if(sessions[i] != null) {
+                	sessions[i].setCopyable(admins.checkCopyable(userName, sessions[i].getTestAdminId()));
+                    TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                }
+            }
+            
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+    
+    //START - TABE BAUM 20 Form Recommendation
+    public TestSessionData getRecommendedTestSessionsForOrgNode(String userName, Integer selectedProductId, Integer orgNodeId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForOrgNode");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = null;
+            if(selectedProductId != null) {
+            	sessions = testAdmin.getRecommendedTestSessionsForOrgNode(orgNodeId, selectedProductId);
+            }
+            else {
+            	sessions = testAdmin.getAllTestSessionsForOrgNode(orgNodeId);
+            }
+            	
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            sessions = tsd.getTestSessions();
+            for(int i=0;i<sessions.length;i++) {
+                if(sessions[i] != null) {
+                    TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                }
+            }
+            
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+    
+    public TestSessionData getRecommendedTestSessionsForOrgNodeWithStudentStatus(String userName,  Integer userId, Integer selectedProductId, Integer orgNodeId, Integer studentId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForOrgNode");
+        try {
+            TestSessionData tsd = new TestSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            TestSession [] sessions = null;
+
+           	sessions = testAdmin.getRecommendedTestSessionsForOrgNodeWithStudentStatus(orgNodeId, userId, selectedProductId, studentId);	
+            tsd.setTestSessions(sessions, pageSize);
+            if(filter != null) tsd.applyFiltering(filter);
+            if(sort != null) tsd.applySorting(sort);
+            if(page != null) tsd.applyPaging(page);
+            sessions = tsd.getTestSessions();
+            for(int i=0;i<sessions.length;i++) {
+                if(sessions[i] != null) {
+                    TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                }
+            }
+            
+            return tsd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+    
+    public RosterElement[] getTestRosterForStudentIdAndOrgNode(Integer studentId, Integer orgNodeId) throws CTBBusinessException
+    {
+        try {
+            
+           
+            RosterElement [] rosterElement = roster.getTestRosterForStudentIdAndOrgNode(studentId);
+            
+            
+            return rosterElement;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+            tae.setStackTrace(se.getStackTrace());
+            throw tae;         
+        }
+    }
+        //END - TABE BAUM 20 Form Recommendation
+        
+    /**
+     * Retrieves a filtered, sorted, paged list of org nodes that are children of the specified org node
+	 * @param userName - identifies the user
+     * @param orgNodeId - identifies the org node
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return NodeData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public NodeData getOrgNodesForParent(String userName, Integer orgNodeId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getOrgNodesForParent");
+        try {
+            NodeData ond = new NodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            ond.setNodes(orgNode.getOrgNodesByParent(orgNodeId), pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getOrgNodesForParent: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of org nodes that are children of the specified org node,
+     * plus a count of all active test sessions scheduled at/below each node in the list.
+	 * @param userName - identifies the user
+     * @param orgNodeId - identifies the org node
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return SessionNodeData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public SessionNodeData getSessionNodesForParent(String userName, Integer orgNodeId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getSessionNodesForParent");
+        try {
+            SessionNodeData ond = new SessionNodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            Node [] nodes = orgNode.getOrgNodesByParent(orgNodeId);
+            SessionNode [] sessionNodes = new SessionNode [nodes.length];
+            for(int i=0;i<nodes.length;i++) {
+                sessionNodes[i] = new SessionNode(nodes[i]);                     
+            }
+            ond.setSessionNodes(sessionNodes, pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            sessionNodes = ond.getSessionNodes();
+            for(int i=0;i<sessionNodes.length && sessionNodes[i] != null;i++) {
+                sessionNodes[i].setSessionCount(orgNode.getSessionCountForAncestorNode(sessionNodes[i].getOrgNodeId()));
+                sessionNodes[i].setChildNodeCount(orgNode.getOrgNodeCountByParent(sessionNodes[i].getOrgNodeId()));
+            }
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getSessionNodesForParent: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+    
+    //START - TABE BAUM 020 Form Recommendation 
+    public SessionNodeData getRecommendedSessionNodesForParent(String userName, Integer orgNodeId, Integer productId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "testAdmin.getSessionNodesForParent");
+        try {
+            SessionNodeData ond = new SessionNodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            Node [] nodes = orgNode.getOrgNodesByParent(orgNodeId);
+            SessionNode [] sessionNodes = new SessionNode [nodes.length];
+            for(int i=0;i<nodes.length;i++) {
+                sessionNodes[i] = new SessionNode(nodes[i]);                     
+            }
+            ond.setSessionNodes(sessionNodes, pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            sessionNodes = ond.getSessionNodes();
+            for(int i=0;i<sessionNodes.length && sessionNodes[i] != null;i++) {
+            	if(productId != null )
+            		sessionNodes[i].setChildNodeCount(orgNode.getRecommendedSessionCountForProductAncestorNode(sessionNodes[i].getOrgNodeId(), productId));
+            	else
+            		sessionNodes[i].setSessionCount(orgNode.getRecommendedSessionCountForAncestorNode(sessionNodes[i].getOrgNodeId()));
+                
+            }
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getSessionNodesForParent: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+    //END - TABE BAUM 020 Form Recommendation 
+    /**
+     * Retrieves a filtered, sorted, paged list of org nodes at which the specified user has a role defined
+	 * @param userName - identifies the user
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return NodeData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public NodeData getTopNodesForUser(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getTopNodesForUser");
+        try {
+            NodeData ond = new NodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            ond.setNodes(orgNode.getTopNodesForUser(userName), pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getTopNodesForUser: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;        
+        }
+    }
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of org nodes at which the specified user has a role defined,
+     * plus a count of all active test sessions scheduled at/below each node in the list.
+	 * @param userName - identifies the user
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return SessionNodeData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public SessionNodeData getTopSessionNodesForUser(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getTopSessionNodesForUser");
+        try {
+            SessionNodeData ond = new SessionNodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            Node [] nodes = orgNode.getTopNodesForUser(userName);
+            SessionNode [] sessionNodes = new SessionNode [nodes.length];
+            for(int i=0;i<nodes.length;i++) {
+                sessionNodes[i] = new SessionNode(nodes[i]);                     
+            }
+            ond.setSessionNodes(sessionNodes, pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            sessionNodes = ond.getSessionNodes();
+            for(int i=0;i<sessionNodes.length && sessionNodes[i] != null;i++) {
+                sessionNodes[i].setSessionCount(orgNode.getSessionCountForAncestorNode(sessionNodes[i].getOrgNodeId()));
+                sessionNodes[i].setChildNodeCount(orgNode.getOrgNodeCountByParent(sessionNodes[i].getOrgNodeId()));
+            }
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getTopSessionNodesForUser: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+    
+    //START - TABE BAUM 020 Form Recommendation 
+    public SessionNodeData getTopRecommendedSessionNodesForUser(String userName,Integer productId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validate(userName, null, "testAdmin.getTopSessionNodesForUser");
+        try {
+            SessionNodeData ond = new SessionNodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            Node [] nodes = orgNode.getTopNodesForUser(userName);
+            SessionNode [] sessionNodes = new SessionNode [nodes.length];
+            for(int i=0;i<nodes.length;i++) {
+                sessionNodes[i] = new SessionNode(nodes[i]);                     
+            }
+            ond.setSessionNodes(sessionNodes, pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            sessionNodes = ond.getSessionNodes();
+            for(int i=0;i<sessionNodes.length && sessionNodes[i] != null;i++) {
+            	if(productId != null)
+            		sessionNodes[i].setSessionCount(orgNode.getRecommendedSessionCountForProductAncestorNode(sessionNodes[i].getOrgNodeId(), productId));
+            	else
+            		sessionNodes[i].setSessionCount(orgNode.getRecommendedSessionCountForAncestorNode(sessionNodes[i].getOrgNodeId()));
+            		
+            	
+                sessionNodes[i].setChildNodeCount(orgNode.getOrgNodeCountByParent(sessionNodes[i].getOrgNodeId()));
+            }
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getTopSessionNodesForUser: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+    //END - TABE BAUM 020 Form Recommendation 
+    /**
+     * Retrieves a filtered, sorted, paged list of roster elements for the specified test session.
+	 * @param userName - identifies the user
+     * @param testAdminId - identifies the test session
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return RosterElementData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public RosterElementData getRosterForTestSession(String userName, Integer testAdminId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+    // validator.validateAdmin(userName, testAdminId, "testAdmin.getRosterElementsForTestSession");
+        try {
+            RosterElementData red = new RosterElementData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            red.setRosterElements(roster.getRosterForTestSession(testAdminId), pageSize);
+            if(filter != null) red.applyFiltering(filter);
+            if(sort != null) red.applySorting(sort);
+            if(page != null) red.applyPaging(page);
+            return red;
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: getRosterElementsForTestSession: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    } 
+    
+    
+    public RosterElementData getRosterForTestSessionWithShowRosterAccom(String userName, Integer testAdminId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+    // validator.validateAdmin(userName, testAdminId, "testAdmin.getRosterElementsForTestSession");
+        try {
+          	
+            RosterElementData red = new RosterElementData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            red.setRosterElements(roster.getRosterForTestSession(testAdminId), pageSize);
+            //System.out.println("red>>>"+red.toString());
+            red = setHasAccomodationAttribute(red,pageSize);
+            if(filter != null) red.applyFiltering(filter);
+            if(sort != null) red.applySorting(sort);
+            if(page != null) red.applyPaging(page);
+            return red;
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: getRosterElementsForTestSession: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    } 
+
+    public HashMap<Integer,ArrayList<ClassHierarchy>> buildOrgNodeIdMap(String userName,Integer test_admin_id) throws CTBBusinessException
+    {
+    	Integer [] orgNodeIds = null;
+    	HashMap<Integer,ArrayList<ClassHierarchy>> orgNodeIdMap = new HashMap<Integer,ArrayList<ClassHierarchy>>();
+		try {
+			
+			orgNodeIds = roster.getOrgNodeIdForUser(userName);	
+			if(null != orgNodeIds){	
+				for(int j=0;j<orgNodeIds.length;j++){
+					ClassHierarchy[] clasHierarchyForUser = roster.getOrgNodeHierachy(userName,test_admin_id, orgNodeIds[j]);		
+					if(null != clasHierarchyForUser && clasHierarchyForUser.length > 0 ) 
+					   	for(int i=0;i<clasHierarchyForUser.length;i++) {
+					   		ArrayList<ClassHierarchy> nodeList = null;
+					   		if (orgNodeIdMap.containsKey(clasHierarchyForUser[i].getOrgNodeId())){
+					   			nodeList = (ArrayList<ClassHierarchy>)orgNodeIdMap.get(clasHierarchyForUser[i].getOrgNodeId());
+					   			nodeList.add(clasHierarchyForUser[i]);
+					   			orgNodeIdMap.remove(clasHierarchyForUser[i].getOrgNodeId());
+					   			orgNodeIdMap.put(clasHierarchyForUser[i].getOrgNodeId(), nodeList);
+					   		}else{
+					   			nodeList = new ArrayList<ClassHierarchy>();
+					   			nodeList.add(clasHierarchyForUser[i]);
+					   			orgNodeIdMap.put(clasHierarchyForUser[i].getOrgNodeId(), nodeList);
+					   		}
+					      }
+				}
+			}
+		} catch (SQLException se) {
+			RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: getRosterElementsForTestSession: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde; 
+		}
+		return orgNodeIdMap;
+    }
+    
+    private RosterElementData setHasAccomodationAttribute(RosterElementData red, Integer pageSize) {
+		// TODO Auto-generated method stub
+    	RosterElement[] re = red.getRosterElements();
+    	for(int i=0;i<re.length;i++){
+    		re[i].setHasAccommodations(re[i].getHasAccommodations());
+    	}
+		 red.setRosterElements(re,pageSize);
+		 return red;
+	}
+
+	public RosterElementData getReportableRosterForTestSession(String userName, Integer testAdminId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+    // validator.validateAdmin(userName, testAdminId, "testAdmin.getRosterElementsForTestSession");
+        try {
+            RosterElementData red = new RosterElementData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            red.setRosterElements(roster.getReportableRosterForTestSession(testAdminId), pageSize);
+            if(filter != null) red.applyFiltering(filter);
+            if(sort != null) red.applySorting(sort);
+            if(page != null) red.applyPaging(page);
+            return red;
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: getRosterElementsForTestSession: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }     
+    
+    /**
+     * Retrieves a roster elements by testRosterId
+     * @param testRosterId - identifies the test roster
+     * @return RosterElement
+     * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public RosterElement getRoster(Integer testRosterId) throws CTBBusinessException
+    {
+        try {
+            RosterElement re = roster.getRosterElement(testRosterId);
+            return re;
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: getRosterElement: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }     
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of test elements which comprise the specified test session.
+     * (presumably 'TS'-type item sets)
+	 * @param userName - identifies the user
+     * @param testAdminId - identifies the test session
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestElementData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public TestElementData getTestElementsForTestSession(String userName, Integer testAdminId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateAdmin(userName, testAdminId, "testAdmin.getTestElementsForTestSession");
+        try {
+            TestElementData ted = new TestElementData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            ted.setTestElements(itemSet.getTestElementsForSession(testAdminId), pageSize);
+            if(filter != null) ted.applyFiltering(filter);
+            if(sort != null) ted.applySorting(sort);
+            if(page != null) ted.applyPaging(page);
+            return ted;
+        } catch (SQLException se) {
+            TestElementDataNotFoundException tee = new TestElementDataNotFoundException("TestSessionStatusImpl: getTestElementsForTestSession: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;  
+        }
+    }    
+    
+    /**
+     * Toggles the validation status of the specifed roster element
+	 * @param userName - identifies the user
+     * @param testRosterId - identifies the test session roster element (student)
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public void toggleRosterValidationStatus(String userName, Integer testRosterId) throws CTBBusinessException{
+        validator.validateRoster(userName, testRosterId, "testAdmin.toggleRosterValidationStatus");
+        try {
+            RosterElement rosterDetail = getRoster(testRosterId);
+            String newValidationStatus = "VA";
+            if (rosterDetail.getValidationStatus().equals("VA"))
+                newValidationStatus = "IN";
+            else if (rosterDetail.getValidationStatus().equals("IN"))
+                newValidationStatus = "VA";   
+            else if (rosterDetail.getValidationStatus().equals("PI"))
+                //newValidationStatus = "PI";  
+                throw new CTBBusinessException("Cannot toggle roster validation status 'Partially Invalid'.");
+
+            rosterDetail.setValidationStatus(newValidationStatus);
+            roster.updateTestRoster(rosterDetail);
+            
+            if (!newValidationStatus.equals("PI")) {
+                StudentSessionStatus [] studentSessionStatuses =studentItemSetStatus.getStudentItemSetStatuses(testRosterId);
+                for (int i=0; i < studentSessionStatuses.length; i++) {
+                    studentSessionStatuses[i].setValidationStatus(newValidationStatus);
+                    studentItemSetStatus.updateStudentItemSetStatus(studentSessionStatuses[i]);
+                }                
+            }
+           
+            // old Weblogic 8.1 JMS call
+            // scorer.sendObjectMessage(testRosterId);
+          
+            // new Weblogic 10.3 JMS call
+             invokeScoring(testRosterId);
+            
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: toggleRosterValidationStatus: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+        catch (Exception se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: toggleRosterValidationStatus: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }
+    
+    /**
+     * Toggles the validation status of the specifed subtests
+	 * @param userName - identifies the user
+     * @param testRosterId - identifies the test session roster element (student)
+     * @param itemSetIds - identifies the TD item sets (subtests)
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public void toggleSubtestValidationStatus(String userName, Integer testRosterId, Integer [] itemSetIds,String status) throws CTBBusinessException{
+        validator.validateRoster(userName, testRosterId, "testAdmin.toggleSubtestValidationStatus");
+        //START- added for updating toggle values of validation ,exemption and absent status
+        try {
+        	if (itemSetIds == null || itemSetIds.length == 0)
+                return;
+             	if(status.equals("ValidationStatus")) {
+		            for (int i=0; i < itemSetIds.length; i++) {
+		            	studentItemSetStatus.toggleSubtestValidationStatus(testRosterId, itemSetIds[i]);
+		            }
+             	}
+             	else if(status.equals("ExemptionStatus")) {
+		            for (int i=0; i < itemSetIds.length; i++) {
+		            	studentItemSetStatus.toggleSubtestExemptionStatus(testRosterId, itemSetIds[i]);
+		            }
+             	}
+             	else if(status.equals("AbsentStatus")) {
+		            for (int i=0; i < itemSetIds.length; i++) {
+		            	studentItemSetStatus.toggleSubtestAbsentStatus(testRosterId, itemSetIds[i]);
+		            }
+             	}
+             	 //END- added for updating toggle values of validation ,exemption and absent status
+            
+            String newRosterStatus = studentItemSetStatus.getRosterValidationStatusFromSubtests(testRosterId);
+            RosterElement rosterDetail = getRoster(testRosterId);
+            rosterDetail.setValidationStatus(newRosterStatus);
+            roster.updateTestRoster(rosterDetail);
+          
+            // old Weblogic 8.1 JMS call
+            // scorer.sendObjectMessage(testRosterId);
+            
+            // new Weblogic 10.3 JMS call
+             invokeScoring(testRosterId);
+            
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: toggleSubtestValidationStatus: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+        catch (Exception se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: toggleSubtestValidationStatus: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }
+    public void toggleSubtestValidationStatus(String userName, Integer testRosterId, String [] itemSetIds,String status) throws CTBBusinessException{
+        validator.validateRoster(userName, testRosterId, "testAdmin.toggleSubtestValidationStatus");
+        //START- added for updating toggle values of validation ,exemption and absent status
+        try {
+            if (itemSetIds == null || itemSetIds.length == 0)
+                return;
+             	if(status.equals("ValidationStatus")) {
+		            for (int i=0; i < itemSetIds.length; i++) {
+		            	String [] temp = itemSetIds[i].split("\\$");
+		            	if(temp[1].equals("PS") || temp[1].equalsIgnoreCase("UNDEFINED")) {
+		            		temp[1] = null;
+		            	}
+		            	studentItemSetStatus.toggleSubtestValidationStatus(testRosterId, Integer.parseInt(temp[0]),temp[1]);
+		            }
+             	}
+             	else if(status.equals("ExemptionStatus")) {
+		            for (int i=0; i < itemSetIds.length; i++) {
+		            	studentItemSetStatus.toggleSubtestExemptionStatus(testRosterId, Integer.valueOf(itemSetIds[i]));
+		            }
+             	}
+             	else if(status.equals("AbsentStatus")) {
+		            for (int i=0; i < itemSetIds.length; i++) {
+		            	studentItemSetStatus.toggleSubtestAbsentStatus(testRosterId, Integer.valueOf(itemSetIds[i]));
+		            }
+             	}
+             	 //END- added for updating toggle values of validation ,exemption and absent status
+            
+            String newRosterStatus = studentItemSetStatus.getRosterValidationStatusFromSubtests(testRosterId);
+            RosterElement rosterDetail = getRoster(testRosterId);
+            rosterDetail.setValidationStatus(newRosterStatus);
+            roster.updateTestRoster(rosterDetail);
+          
+            // old Weblogic 8.1 JMS call
+            // scorer.sendObjectMessage(testRosterId);
+            
+            // new Weblogic 10.3 JMS call
+             invokeScoring(testRosterId);
+            
+        } catch (SQLException se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: toggleSubtestValidationStatus: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+        catch (Exception se) {
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: toggleSubtestValidationStatus: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }
+    //Start - added for  Process Scores  button
+    public void rescoreStudent(Integer testRosterId) throws CTBBusinessException{
+    	
+    	try {
+    		 //Start-  Defect #66489 and #66499 (Editing and Ending Test Session)
+    		/* RosterElement rosterDetail = getRoster(testRosterId);
+    		 String newScoringStatus = "CO";
+    		 rosterDetail.setScoringStatus(newScoringStatus);
+             roster.updateTestRoster(rosterDetail);*/
+             //End- Defect #66489 and #66499 (Editing and Ending Test Session)
+           
+    		 // new Weblogic 10.3 JMS call
+             invokeScoring(testRosterId);
+    	 }catch (SQLException se) {
+             RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: Roster Not found : " + se.getMessage());
+             rde.setStackTrace(se.getStackTrace());
+             throw rde;  
+         }
+         catch (Exception se) {
+             RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl:  Roster Not found : " + se.getMessage());
+             rde.setStackTrace(se.getStackTrace());
+             throw rde;  
+         }
+    }
+    
+     //End - added for  Process Scores  button
+     
+         private void invokeScoring(Integer testRosterId) throws Exception 
+    {
+		getResourceValue();
+	    InitialContext ic = QueueSend.getInitialContext(jndiFactory,jmsURL,jmsPrincipal,jmsCredentials);
+	    QueueSend qs = new QueueSend();
+	    qs.init(ic, jmsFactory, jmsQueue);
+	    qs.readAndSend(qs,testRosterId);
+	    qs.close();
+	    ic.close();
+	  }
+        
+    private void getResourceValue() throws Exception {
+	    ResourceBundle rb = ResourceBundle.getBundle("security");
+	    jndiFactory = rb.getString("jndiFactory");
+	    jmsFactory = rb.getString("jmsFactory");
+	    jmsURL = rb.getString("jmsURL");
+	    jmsQueue = rb.getString("jmsQueue");
+	    jmsPrincipal = rb.getString("jmsPrincipal");
+	    jmsCredentials = rb.getString("jmsCredentials");
+    }
+	    
+    /**
+     * Retrieves a filtered, sorted, paged list of active tests, meaning tests having
+     * scheduled sessions whose login window opens within the next 60 days. Each ActiveTest
+     * object contains a list of all subtests (TD item sets) belonging to the test.
+	 * @param userName - identifies the user
+     * @return ActiveTestData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public ActiveTestData getActiveTestsForUser(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException {
+        validator.validate(userName, null, "testAdmin.getActiveTestsForUser");
+        try {
+            ActiveTestData atd = new ActiveTestData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            ActiveTest [] tests = itemSet.getActiveTestsForUser(userName);
+            for(int i=0;i<tests.length;i++) {
+                tests[i].setContentSize(itemSet.getContentSizeForTest(tests[i].getItemSetId()));
+                tests[i].setSubtests(itemSet.getTestElementsForAncestor(tests[i].getItemSetId(), "TD"));
+            }
+            atd.setActiveTests(tests, pageSize);
+            if(filter != null) atd.applyFiltering(filter);
+            if(sort != null) atd.applySorting(sort);
+            if(page != null) atd.applyPaging(page);
+            return atd;
+        } catch (SQLException se) {
+            TestElementDataNotFoundException rde = new TestElementDataNotFoundException("TestSessionStatusImpl: getActiveTestsForUser: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }
+    
+    /**
+     * Retrieves a filtered, sorted, paged list of active sessions for a test, meaning
+     * sessions of the specified test whose login window opens within the next 60 days, or any
+     * sessions thereafter with login windows opening less than 60 days after the close
+     * of the login window of any previous session of the specified test.
+	 * @param userName - identifies the user
+     * @param itemSetId - identifies the test
+     * @return ActiveSessionData
+	 * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+    public ActiveSessionData getActiveSessionsForTest(String userName, Integer itemSetId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException {
+        validator.validateItemSet(userName, itemSetId, "testAdmin.getActiveSessionsForTest");
+        try {
+            ActiveSessionData asd = new ActiveSessionData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            ActiveSession [] sessions = testAdmin.getActiveSessionsForTest(itemSetId);
+            // remove sessions with >60 day gap before window opens
+            long millisForWindow = DateUtils.daysToMillis(60);
+            ArrayList actives = new ArrayList();
+            boolean active = true;
+            long currTime = System.currentTimeMillis();
+            long lastEnd = currTime;
+            for(int i=0;i<sessions.length && active;i++) {
+                 ActiveSession session = sessions[i];
+                 boolean visible = "true".equals(testAdmin.checkVisibility(userName, session.getTestAdminId()));
+                 if(visible) {
+                     active = false;
+                     long nextStart = session.getLoginStartDate().getTime();
+                     if (nextStart <= currTime && session.getLoginEndDate().getTime() >= currTime && visible) {
+                        actives.add(session);
+                        active = true;
+                     } else {
+                        boolean activePred = false;
+                        if ((nextStart - currTime < millisForWindow) && visible) {
+                            activePred = true;
+                            active = true;
+                        }
+                        
+                        for(int j=0; j < actives.size() && !activePred; j++) {
+                            if(((nextStart - ((ActiveSession)actives.get(j)).getLoginEndDate().getTime()) < millisForWindow) && visible) {
+                                activePred = true;
+                                active = true;
+                            }
+                        }
+                        if(activePred) actives.add(session);
+                     }
+                     lastEnd = session.getLoginEndDate().getTime();
+                     if(lastEnd < (currTime + millisForWindow)) {
+                        active = true;
+                     }
+                } else {
+                    active = true;
+                }
+                TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(session);
+            }
+            sessions = (ActiveSession []) actives.toArray(new ActiveSession[0]);
+            asd.setActiveSessions(sessions, pageSize);
+            if(filter != null) asd.applyFiltering(filter);
+            if(sort != null) asd.applySorting(sort);
+            if(page != null) asd.applyPaging(page);
+            return asd;
+        } catch (SQLException se) {
+            TestAdminDataNotFoundException rde = new TestAdminDataNotFoundException("TestSessionStatusImpl: getActiveSessionsForTest: " + se.getMessage());
+            rde.setStackTrace(se.getStackTrace());
+            throw rde;  
+        }
+    }
+    
+    /**
+     * Get user information including full name and system id for the specified user name.
+     * If the specified user lies withing the requesting user's visible hierarchy,
+     * all fields are returned - if not, only the first, last, and middle names
+     * of the specified user are returned. Each user object contains a Customer object,
+     * which contains information about the user's customer, including a flag, hideAccommodations,
+     * which indicates whether accommodation-related UI elements should be hidden for
+     * the specified user.
+     * @common:operation
+     * @param userName - identifies the calling user
+     * @param detailUserName - identifies the user whose information is desired
+     * @return User
+     * @throws CTBBusinessException
+     */
+    public User getUserDetails(String userName, String detailUserName) throws CTBBusinessException{
+        boolean hasPerms = true;
+        try {
+            validator.validateUser(userName, detailUserName, "testAdmin.getUserDetails");
+        } catch (ValidationException ve) {
+            hasPerms = false;
+        }
+        try {
+            User user = users.getUserDetails(detailUserName);
+            if(user != null) {
+                user.setCustomer(users.getCustomer(detailUserName));
+                user.setRole(users.getRole(detailUserName));
+                
+                if(!hasPerms) {
+                    User secureUser = new User();
+                    secureUser.setFirstName(user.getFirstName());
+                    secureUser.setLastName(user.getLastName());
+                    secureUser.setMiddleName(user.getMiddleName());
+                    secureUser.setUserId(user.getUserId());
+                    secureUser.setUserName(user.getUserName());
+                    secureUser.setCustomer(user.getCustomer());
+                    //START- Added for Deferred defect 52645
+                    secureUser.setPasswordExpirationDate(user.getPasswordExpirationDate());
+                    //END- Added for Deferred defect 52645
+                    return secureUser;
+                } else {
+                    return user;
+                }
+            } else {
+                return null;
+            }
+        } catch (SQLException se) {
+            CTBBusinessException cbe = new UserDataNotFoundException("ScheduleTestImpl: getUserDetails: " + se.getMessage());
+            cbe.setStackTrace(se.getStackTrace());
+            throw cbe;
+        }  
+    }
+    
+    
+   /**
+     * Retrieves a filtered, sorted, paged list of roster elements for the specified test session.
+     * @param userName - identifies the user
+     * @param testAdminId - identifies the test session
+     * @param orgNodeId - identifies the org node
+     * @param filter - filtering params
+     * @param page - paging params
+     * @param sort - sorting params
+     * @return RosterElementData
+     * @throws com.ctb.exception.CTBBusinessException
+     * @common:operation
+     */
+
+    public RosterElementData getRosterForTestSessionAndOrgNode(java.lang.String userName, java.lang.Integer testAdminId, java.lang.Integer orgNodeId, com.ctb.bean.request.FilterParams filter, com.ctb.bean.request.PageParams page, com.ctb.bean.request.SortParams sort) throws com.ctb.exception.CTBBusinessException
+    {
+        validator.validateAdmin(userName, testAdminId, "testAdmin.getRosterElementsForTestSession");
+
+        try {
+
+            RosterElementData red = new RosterElementData();
+
+            Integer pageSize = null;
+
+            if(page != null) {
+
+                pageSize = new Integer(page.getPageSize());
+
+            }
+
+            red.setRosterElements(roster.getRosterForTestSessionAndOrgNode(testAdminId, orgNodeId), pageSize);
+
+            if(filter != null) red.applyFiltering(filter);
+
+            if(sort != null) red.applySorting(sort);
+
+            if(page != null) red.applyPaging(page);
+
+            return red;
+
+        } catch (SQLException se) {
+
+            RosterDataNotFoundException rde = new RosterDataNotFoundException("TestSessionStatusImpl: getRosterElementsForTestSession: " + se.getMessage());
+
+            rde.setStackTrace(se.getStackTrace());
+
+            throw rde;  
+
+        }
+
+    }  
+    
+
+    
+
+    /**
+     * Retrieves a list of child org nodes of the specified org node,
+     * plus a count of users who have roles anywhere at/below each 
+     * org node in the list (userCount). If testAdminId is not null, a count of users at
+     * or below each node who are assigned as proctors to the specified session
+     * is also attached to each node (proctorCount).
+     * @common:operation
+     * @param userName - identifies the user
+     * @param testAdminId - identifies the test session
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return UserNodeData
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public UserNodeData getTopUserNodesForUser(String userName, Integer testAdminId, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+    {
+        validator.validateAdmin(userName, testAdminId, "testAdmin.getTopUserNodesForUser");
+        try {
+            UserNodeData ond = new UserNodeData();
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            Node [] nodes = orgNode.getTopNodesForUser(userName);
+            UserNode [] userNodes = new UserNode [nodes.length];
+            for(int i=0;i<nodes.length;i++) {
+                userNodes[i] = new UserNode(nodes[i]);                     
+            }
+            ond.setUserNodes(userNodes, pageSize);
+            for(int i=0;i<userNodes.length && userNodes[i] != null;i++) {
+                userNodes[i].setUserCount(orgNode.getUserCountForAncestorNode(userNodes[i].getOrgNodeId()));            
+                if(testAdminId != null) {
+                    userNodes[i].setProctorCount(orgNode.getProctorCountForAncestorNodeAndAdmin(userNodes[i].getOrgNodeId(), testAdminId));            
+                }
+            }
+            FilterParams implicitFilter = new FilterParams();
+            FilterParam [] newFilters = new FilterParam [1];
+            Integer [] args = new Integer[1];
+            args[0] = new Integer(0);
+            FilterParam countFilter = new FilterParam("UserCount", args, FilterType.GREATERTHAN);
+            newFilters[0] = countFilter;
+            implicitFilter.setFilterParams(newFilters);
+            ond.applyFiltering(implicitFilter);
+            ond.setUserNodes(ond.getUserNodes(), pageSize);
+            if(filter != null) ond.applyFiltering(filter);
+            if(sort != null) ond.applySorting(sort);
+            if(page != null) ond.applyPaging(page);
+            return ond;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("ScheduleTestImpl: getTopUserNodesForUser: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+    /**     
+     * Retrieves the  student item set statuses for a session.
+     * @common:operation
+     * @param userName - identifies the user
+     * @param testAdminId - identifies the test session
+     * @param studentId  -  identifies the student 
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return StudentSessionStatusesData
+	 * @throws com.ctb.exception.CTBBusinessException
+     */ 
+     public StudentSessionStatusData  getStudentItemSetStatusesForRoster(java.lang.String userName,java.lang.Integer studentId,java.lang.Integer testAdminId,FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+     {
+        validator.validate(userName,testAdminId,"getStudentItemSetStatusesForRoster");
+        
+        try{
+            StudentSessionStatusData sssd =  new StudentSessionStatusData();
+            StudentSessionStatus [] sss = studentItemSetStatus.getStudentItemSetStatusesForRoster(studentId,testAdminId);
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            sssd.setStudentSessionStatuses(sss,pageSize);
+            if(filter != null) sssd.applyFiltering(filter);
+            if(sort != null) sssd.applySorting(sort);
+            if(page != null) sssd.applyPaging(page);
+            return sssd;
+        }catch (SQLException se) {
+            CTBBusinessException cbe = new StudentSessionStatusNotFoundException("TestSessionStatusImpl: getStudentItemSetStatusesForRoster: " + se.getMessage());
+            cbe.setStackTrace(se.getStackTrace());
+            throw cbe;
+        }        
+     }
+     
+     /**     
+     * Retrieves the  student item set statuses for a session.
+     * @common:operation
+     * @param userName - identifies the user
+     * @param parentItemSetId - identifies the parent item set
+     * @param itemSetTyp -  identifies the item set type  
+	 * @param filter - filtering params
+	 * @param page - paging params
+	 * @param sort - sorting params
+	 * @return TestElementData
+	 * @throws com.ctb.exception.CTBBusinessException
+     */ 
+     public TestElementData  getTestElementsForParent(java.lang.String userName,Integer parentItemSetId, String itemSetType, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException
+     {
+        validator.validate(userName,parentItemSetId,"getTestElementsForParent");
+        
+        try{
+            TestElementData ted =  new TestElementData();
+            TestElement [] te = itemSet.getTestElementsForParent(parentItemSetId,itemSetType);
+            Integer pageSize = null;
+            if(page != null) {
+                pageSize = new Integer(page.getPageSize());
+            }
+            ted.setTestElements(te,pageSize);
+            if(filter != null) ted.applyFiltering(filter);
+            if(sort != null) ted.applySorting(sort);
+            if(page != null) ted.applyPaging(page);
+            return ted;
+        }catch (SQLException se) {
+            CTBBusinessException cbe = new TestElementDataNotFoundException("TestSessionStatusImpl: getTestElementsForParent: " + se.getMessage());
+            cbe.setStackTrace(se.getStackTrace());
+            throw cbe;
+        }        
+     }
+     
+    /**
+     * Get customer configuration for the specified customer.
+     * @common:operation
+     * @param userName - identifies the calling user
+     * @param customerId - identifies the customer whose information is desired
+     * @return CustomerConfiguration []
+     * @throws CTBBusinessException
+     */
+    public CustomerConfiguration [] getCustomerConfigurations(String userName, Integer customerId) throws CTBBusinessException
+    {
+        validator.validateCustomer(userName, customerId, "TestSessionStatusImpl.getCustomerConfigurations");
+        try {
+            CustomerConfiguration [] customerConfigurations = customerConfiguration.getCustomerConfigurations(customerId.intValue());
+            if (customerConfigurations == null || customerConfigurations.length == 0) {
+                customerConfigurations = customerConfiguration.getCustomerConfigurations(CTB_CUSTOMER_ID);
+            }
+            
+            if (customerConfigurations != null && customerConfigurations.length > 0) 
+            {
+                for (int i = 0; i < customerConfigurations.length; i++) {
+                    CustomerConfiguration cutomerConfig = customerConfigurations[i];
+                    CustomerConfigurationValue [] customerConfigurationValues 
+                        = customerConfiguration.getCustomerConfigurationValues(cutomerConfig.getId().intValue());
+                    cutomerConfig.setCustomerConfigurationValues(customerConfigurationValues);              
+                }
+            }
+            return customerConfigurations;
+        } catch (SQLException se) {
+            CustomerConfigurationDataNotFoundException tee = new CustomerConfigurationDataNotFoundException("TestSessionStatusImpl: getCustomerConfigurations: " + se.getMessage());
+            tee.setStackTrace(se.getStackTrace());
+            throw tee;
+        }
+    }
+    
+        
+    /**
+     * Retrieves the TestProduct for the given testAdminId
+     * 
+     *  @common:operation
+     * @userName -  Identifies the user
+     * @ testAdminId  -  Identifies the test admin
+     */
+    public TestProduct  getProductForTestAdmin(String userName, Integer testAdminId) throws com.ctb.exception.CTBBusinessException
+    {
+        validator.validateAdmin(userName, testAdminId, "TestSessionStatusImpl.getProductForTestAdmin");
+            try{
+                TestProduct tp = product.getProductForTestAdmin(testAdminId);
+                return tp;                  
+            }catch(SQLException se){
+                CTBBusinessException cbe = new RosterDataNotFoundException("TestSessionStatusImpl: getProductForTestAdmin: " + se.getMessage());
+                cbe.setStackTrace(se.getStackTrace());
+                throw cbe;                
+            }        
+    }
+    
+    
+    /**
+     * Retrieves a list of ancestor org nodes of the specified org node
+     * @common:operation
+     * @param userName - identifies the user
+     * @param orgNodeId - identifies the parent org node
+	 * @return OrganizationNode []
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public OrganizationNode [] getAncestorOrganizationNodesForOrgNode(String userName, Integer orgNodeId) throws com.ctb.exception.CTBBusinessException
+    {
+        validator.validateNode(userName, orgNodeId, "TestSessionStatusImpl.getAncestorOrganizationNodesForOrgNode");
+        try {
+            Integer [] topOrgNodeIds = customerConfiguration.getTopOrgNodeIdsForUser(userName);
+            String findInColumn = "ona1.ancestor_org_node_id in ";
+            OrganizationNode [] orgNodes = customerConfiguration.getAncestorOrganizationNodesForOrgNodeAtAndBelowTopOrgNodes(orgNodeId, SQLutils.generateSQLCriteria(findInColumn ,topOrgNodeIds));
+            return orgNodes;
+        } catch (SQLException se) {
+            OrgNodeDataNotFoundException one = new OrgNodeDataNotFoundException("TestSessionStatusImpl: getAncestorOrganizationNodesForOrgNode: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+    }
+        
+     
+
+    /**
+     * Toggle the customer flag status for the specified test roster.
+     * @common:operation
+     * @param testRosterId - identifies the test roster
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public void toggleCustomerFlagStatus(String userName, Integer testRosterId) throws com.ctb.exception.CTBBusinessException
+    {
+         try {
+            validator.validateRoster(userName, testRosterId, "testAdmin.toggleCustomerFlagStatus");
+            User user = getUserDetails(userName, userName);
+            Customer customer = user.getCustomer();
+            Integer customerId = customer.getCustomerId();
+            CustomerConfigurationValue[] customerConfigurationValue = null;
+            CustomerConfiguration cutomerConfiguration = null;
+            
+            CustomerConfiguration [] ccArray = customerConfiguration.getCustomerConfigurations(customerId.intValue());
+            if (ccArray != null && ccArray.length > 0) 
+            {
+                for (int i = 0; i < ccArray.length; i++) {
+                    CustomerConfiguration cutomerConfig = ccArray[i];
+                    if(cutomerConfig.getCustomerConfigurationName().equalsIgnoreCase("Roster_Status_Flag")){
+                        cutomerConfiguration = ccArray[i];
+                        customerConfigurationValue
+                            = customerConfiguration.getCustomerConfigurationValues(cutomerConfig.getId().intValue());
+                        cutomerConfiguration.setCustomerConfigurationValues(customerConfigurationValue);  
+                        break; 
+                    }           
+                }
+            }
+            
+            RosterElement rosterDetail = getRoster(testRosterId);
+            Integer currentPosition = null;
+            Integer expectedPosition = null;
+            
+            if (rosterDetail.getCustomerFlagStatus()!= null && rosterDetail.getCustomerFlagStatus().indexOf(CUSTOMER_CONFIG_PARTIALLY) >= 0)
+                throw new CTBBusinessException("Cannot toggle roster customer flag status '"+rosterDetail.getCustomerFlagStatus()+"'.");
+            
+            if(rosterDetail.getCustomerFlagStatus()!=null) {
+                expectedPosition = getExpectedPosition(customerConfigurationValue,rosterDetail.getCustomerFlagStatus());
+            }
+            else if (cutomerConfiguration != null){
+                expectedPosition = getExpectedPosition(customerConfigurationValue,cutomerConfiguration.getDefaultValue());
+            }
+            if (expectedPosition != null){
+                String newConfig = customerConfigurationValue[expectedPosition.intValue()].getCustomerConfigurationValue();
+                rosterDetail.setCustomerFlagStatus(newConfig);
+                roster.updateTestRoster(rosterDetail) ;
+                
+                StudentSessionStatus [] studentSessionStatuses =studentItemSetStatus.getStudentItemSetStatuses(testRosterId);
+                for (int i=0; i < studentSessionStatuses.length; i++) {
+                    studentSessionStatuses[i].setCustomerFlagStatus(newConfig);
+                    studentItemSetStatus.updateStudentItemSetStatus(studentSessionStatuses[i]);
+                }                
+            }
+            
+         
+         } catch (SQLException se) {
+            RosterDataNotFoundException one = new RosterDataNotFoundException("TestSessionStatusImpl: toggleCustomerFlagStatus: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+         }
+         
+    }
+
+    /**
+     * Toggle the customer flag status for the specified subtests.
+     * @common:operation
+     * @param testRosterId - identifies the test session roster element (student)
+     * @param itemSetIds - identifies the TD item sets (subtests)
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public void toggleSubtestCustomerFlagStatus(String userName, Integer testRosterId, Integer [] itemSetIds) throws com.ctb.exception.CTBBusinessException
+    {
+         try {
+            validator.validateRoster(userName, testRosterId, "testAdmin.toggleSubtestCustomerFlagStatus");
+            if (itemSetIds == null || itemSetIds.length == 0)
+                return;
+                
+            User user = getUserDetails(userName, userName);
+            Customer customer = user.getCustomer();
+            Integer customerId = customer.getCustomerId();
+            CustomerConfigurationValue[] customerConfigurationValue = null;
+            CustomerConfiguration cutomerConfiguration = null;
+            
+            CustomerConfiguration [] ccArray = customerConfiguration.getCustomerConfigurations(customerId.intValue());
+            if (ccArray != null && ccArray.length > 0) 
+            {
+                for (int i = 0; i < ccArray.length; i++) {
+                    CustomerConfiguration cutomerConfig = ccArray[i];
+                    if(cutomerConfig.getCustomerConfigurationName().equalsIgnoreCase("Roster_Status_Flag")){
+                        cutomerConfiguration = ccArray[i];
+                        customerConfigurationValue
+                            = customerConfiguration.getCustomerConfigurationValues(cutomerConfig.getId().intValue());
+                        cutomerConfiguration.setCustomerConfigurationValues(customerConfigurationValue);  
+                        break; 
+                    }           
+                }
+            }
+            
+            if (cutomerConfiguration == null)
+                throw new CTBBusinessException("Roster_Status_Flag is not found in customer configuration.");
+                
+            if (customerConfigurationValue == null || customerConfigurationValue.length == 0)
+                throw new CTBBusinessException("No customer configuration values found for Roster_Status_Flag.");
+
+            HashMap itemSetIdHash = new HashMap();
+            for (int i=0; i < itemSetIds.length; i++) {
+                itemSetIdHash.put(itemSetIds[i],itemSetIds[i]);
+            }
+            
+            StudentSessionStatus [] studentSessionStatuses =studentItemSetStatus.getStudentItemSetStatuses(testRosterId);
+            for (int i=0; i < studentSessionStatuses.length; i++) {
+                if (itemSetIdHash.containsKey(studentSessionStatuses[i].getItemSetId())) {
+                    Integer expectedPosition = null;
+                    if(studentSessionStatuses[i].getCustomerFlagStatus()!=null) {
+                        expectedPosition = getExpectedPosition(customerConfigurationValue,studentSessionStatuses[i].getCustomerFlagStatus());
+                    }
+                    else if (cutomerConfiguration != null){
+                        expectedPosition = getExpectedPosition(customerConfigurationValue,cutomerConfiguration.getDefaultValue());
+                    }
+                    if (expectedPosition != null){
+                        String newConfig = customerConfigurationValue[expectedPosition.intValue()].getCustomerConfigurationValue();
+                        studentSessionStatuses[i].setCustomerFlagStatus(newConfig);
+                        studentItemSetStatus.updateStudentItemSetStatus(studentSessionStatuses[i]);
+                    }
+                }
+                else if (studentSessionStatuses[i].getCustomerFlagStatus() == null || studentSessionStatuses[i].getCustomerFlagStatus().equals("")) {
+                    studentSessionStatuses[i].setCustomerFlagStatus(cutomerConfiguration.getDefaultValue());
+                    studentItemSetStatus.updateStudentItemSetStatus(studentSessionStatuses[i]);
+                }
+            } 
+            
+            String newRosterStatus = studentItemSetStatus.getRosterCustomerFlagStatusFromSubtests(testRosterId);
+            if (newRosterStatus == null || newRosterStatus.trim().equals(""))
+                newRosterStatus = cutomerConfiguration.getDefaultValue();
+            else if (newRosterStatus.equals("PI")) {
+                Integer expectedPosition = getExpectedPosition(customerConfigurationValue,cutomerConfiguration.getDefaultValue());
+                newRosterStatus = customerConfigurationValue[expectedPosition.intValue()].getCustomerConfigurationValue();
+                newRosterStatus = CUSTOMER_CONFIG_PARTIALLY+newRosterStatus;
+            }
+            
+            RosterElement rosterDetail = getRoster(testRosterId);
+            rosterDetail.setCustomerFlagStatus(newRosterStatus);
+            roster.updateTestRoster(rosterDetail) ;
+         
+         } catch (SQLException se) {
+            RosterDataNotFoundException one = new RosterDataNotFoundException("TestSessionStatusImpl: toggleSubtestCustomerFlagStatus: " + se.getMessage());
+            one.setStackTrace(se.getStackTrace());
+            throw one;
+        }
+         
+    }
+
+    
+    /**
+     * To check if a user's customer is configured to allow subtest invalidation
+     * @common:operation
+     * @param userName - identifies the user
+	 * @return Boolean
+	 * @throws com.ctb.exception.CTBBusinessException
+     */
+    public Boolean allowSubtestInvalidation(String userName) throws CTBBusinessException{
+        try {
+            Boolean hasProgramStatusConfig = Boolean.FALSE;
+            Integer customerId = users.getCustomerIdForName(userName);
+            if(customerId != null){
+                CustomerConfiguration[] customerConfigs = customerConfiguration.getCustomerConfigurations(customerId.intValue());
+                if(customerConfigs != null && customerConfigs.length>0 ){
+                    for (int i = 0; i<customerConfigs.length; i++){
+                        CustomerConfiguration customerConfig = customerConfigs[i];
+                        if((CUSTOMER_CONFIG_ALLOW_SUBTEST_INVALIDATION.equals(customerConfig.getCustomerConfigurationName())) 
+                                    && ("T".equals(customerConfig.getDefaultValue()))){
+                            hasProgramStatusConfig = Boolean.TRUE;
+                        }
+                    }
+                }
+            }
+            return hasProgramStatusConfig;
+        } 
+        catch (Exception e){ 
+			e.printStackTrace();
+            throw new CTBBusinessException("Program Status Config");
+        }
+    }
+    
+    
+    /**
+     * @common:operation
+     */
+    public Boolean hasProgramStatusConfig(String userName) throws CTBBusinessException{
+        try {
+            Boolean hasProgramStatusConfig = Boolean.FALSE;
+            Integer customerId = users.getCustomerIdForName(userName);
+            if(customerId != null){
+                CustomerConfiguration[] customerConfigs = customerConfiguration.getCustomerConfigurations(customerId.intValue());
+                if(customerConfigs != null && customerConfigs.length>0 ){
+                    for (int i = 0; i<customerConfigs.length; i++){
+                        CustomerConfiguration customerConfig = customerConfigs[i];
+                        if(("Program_Status".equals(customerConfig.getCustomerConfigurationName())) 
+                                    && ("T".equals(customerConfig.getDefaultValue()))){
+                            hasProgramStatusConfig = Boolean.TRUE;
+                        }
+                    }
+                }
+            }
+            return hasProgramStatusConfig;
+        } 
+        catch (Exception e){ 
+			e.printStackTrace();
+            throw new CTBBusinessException("Program Status Config");
+        }
+    }
+    
+    
+    /**
+     * Check whether user has the
+     * @common:operation
+     * @param userName - identifies the user
+     * @param  customerId - identifies the customer
+     * @return Boolean
+	 * @throws CTBBusinessException
+     */
+    public Boolean hasUploadDownloadConfig(String userName) throws CTBBusinessException {
+        try {
+            Boolean hasUploadDownloadConfig = Boolean.FALSE;
+            Integer customerId = users.getCustomerIdForName(userName);
+            if(customerId != null){
+                CustomerConfig[] cc = uploadDataFile.getCustomerConfigurationEntries(customerId);  
+                if(cc != null && cc.length>0 ){
+                    for (int i = 0; i<cc.length; i++){
+                        CustomerConfig customerConfig = cc[i];
+                        if((CUSTOMER_CONFIG_UPLOAD_DOWNLOAD.
+                                    equals(customerConfig.getCustomerConfigurationName())) 
+                                    && ("T".equals(customerConfig.getDefaultValue()))){
+                            hasUploadDownloadConfig = Boolean.TRUE;
+                        }
+                    }
+                }
+            }
+            return hasUploadDownloadConfig;
+        } catch (Exception e) {
+			e.printStackTrace();
+            throw new CTBBusinessException("hasUploadDownloadConfig");
+        }
+    }
+    
+     private Integer getExpectedPosition (CustomerConfigurationValue []customerConfigurationValue, String statusFlag) {
+        
+        LinkedHashMap rosterMap = new LinkedHashMap ();
+        
+        Integer expectedPosition = null;
+        
+        for (int i = 0; i < customerConfigurationValue.length; i++) {
+            CustomerConfigurationValue tempC = (CustomerConfigurationValue)customerConfigurationValue[i];
+            rosterMap.put(tempC.getCustomerConfigurationValue(),new Integer(i));
+        }
+        
+        if (rosterMap.containsKey(statusFlag)){
+            
+            Integer currentPosition = (Integer)rosterMap.get(statusFlag);
+            if (currentPosition.intValue() == (rosterMap.size() - 1)) {
+                expectedPosition = new Integer(0);
+            } else {
+                expectedPosition = new Integer(currentPosition.intValue() + 1);
+            }
+        }
+        
+        return expectedPosition;        
+    }
+     
+     /**
+      * New method added for CR - GA2011CR001
+      * Get customer configuration value for the specified customer configuration.
+      * @common:operation
+      * @param configId - identifies the customerconfiguration whose information is desired
+      * @return CustomerConfigurationValue []
+      * @throws CTBBusinessException
+      */
+     public CustomerConfigurationValue [] getCustomerConfigurationsValue( Integer configId) throws CTBBusinessException
+     {	
+     	try {
+     	CustomerConfigurationValue [] customerConfigurationValues 
+         = customerConfiguration.getCustomerConfigurationValues(configId);
+     	 return customerConfigurationValues;
+ 	    } catch (SQLException se) {
+ 	        CustomerConfigurationDataNotFoundException tee = new CustomerConfigurationDataNotFoundException("StudentManagementImpl: getCustomerConfigurations: " + se.getMessage());
+ 	        tee.setStackTrace(se.getStackTrace());
+ 	        throw tee;
+ 	    }
+     }
+     
+     /**
+      * ISTEP CR032 -Download Test
+      * Each CustomerTestResource
+      * object contains a list of all CustomerTestResource.
+ 	  * @param userName - identifies the user
+      * @return CustomerTestResourceData
+ 	  * @throws com.ctb.exception.CTBBusinessException
+      * @common:operation
+      */
+     public CustomerTestResourceData getCustomerTestResources(String userName, FilterParams filter, PageParams page, SortParams sort) throws CTBBusinessException {
+         validator.validate(userName, null, "testAdmin.getCustomerTestResources");
+         try {
+        	 Integer customerId= this.users.getCustomer(userName).getCustomerId();
+        	 CustomerTestResourceData ctr = new CustomerTestResourceData();
+             Integer pageSize = null;
+             if(page != null) {
+                 pageSize = new Integer(page.getPageSize());
+             }
+             CustomerTestResource []  tests = itemSet.getCustomerTestResources(customerId);
+            
+             ctr.setCustomerTestResources(tests, pageSize);
+             if(filter != null) ctr.applyFiltering(filter);
+             if(sort != null) ctr.applySorting(sort);
+             if(page != null) ctr.applyPaging(page);
+             return ctr;
+         
+         } catch (SQLException se) {
+             TestElementDataNotFoundException rde = new TestElementDataNotFoundException("TestSessionStatusImpl: getCustomerTestResources: " + se.getMessage());
+             rde.setStackTrace(se.getStackTrace());
+             throw rde;  
+         }
+     }
+   
+     // Change for OAS – Alternate URL - Part I-TAS
+     /**
+      *  Alternate URL -Download Installer
+      * Each CustomerTestResource
+      * object contains a list of all CustomerTestResource.
+ 	  * @param userName - identifies the user
+ 	  * @param resourceTypeCode - identifies the resource(OS) type code
+      * @return String (Uri of corresponding product and OS)
+ 	  * @throws com.ctb.exception.CTBBusinessException
+      * @common:operation
+      */
+     public String getParentResourceUriForUser(String userName, String resourceTypeCode) 
+     		throws CTBBusinessException {
+    	 
+    	 NonCatalogLogger logger =OASLogger.getLogger(this.getClass().getName());
+    	 logger.info("Entering getParentResourceUriForUser()");
+    	 String uri = "";
+    	 String productType = "";   	 
+    	 // In future if new parent products are added, then add here in this array also.
+    	 String[] priorityArray = {"GA-CRCT", "ISTEP", "LLEAB", "TerraNova", "TABE", "TABE Adaptive", "OK-EOI", "TERRA3"}; // Product list.
+    	 int newOrder = 0;
+    	 int oldOrder = priorityArray.length;
+    	 try {    		
+    		 UserParentProductResource[] ppResourceList = product.getParentProductListForUser(userName, resourceTypeCode);
+    		 if (ppResourceList != null) {
+				if (ppResourceList.length == 1)
+					uri = ppResourceList[0].getResourceURI();
+				else { // For a customer having more than one product
+					for (int i = 0; i < ppResourceList.length; i++) {
+						productType = ppResourceList[i].getProductDescription();
+						for (int j = 0; j < priorityArray.length; j++) {
+							if (productType != null && productType.startsWith(priorityArray[j])) {
+								newOrder = j;
+								break;
+							}
+						}
+						if (newOrder < oldOrder && newOrder != 0) { // changed for defect #66762
+							oldOrder = newOrder;
+							uri = ppResourceList[i].getResourceURI();
+						}
+					}
+				}
+			} 
+    		 if(uri.equals("")) {
+				uri = product.getDemoInstallerUri(resourceTypeCode, 100);
+			}
+    	 } catch (SQLException se) {
+             ProductDataNotFoundException rde = new ProductDataNotFoundException("TestSessionStatusImpl: getParentResourceUriForUser: " + se.getMessage());
+             rde.setStackTrace(se.getStackTrace());
+             throw rde;  
+         }
+    	 catch (Exception se) {
+    		 CTBBusinessException rde = new CTBBusinessException("TestSessionStatusImpl: getParentResourceUriForUser: " + se.getMessage());
+             rde.setStackTrace(se.getStackTrace());
+             throw rde;   		 
+    	 }
+    	 return uri;
+     }
+     public void updateDonotScore(Integer testRosterId, String dnsStatus, Integer userName) throws CTBBusinessException {	
+     	try {
+     		this.roster.updateDonotScore(testRosterId, dnsStatus, userName);
+     	 } catch (SQLException se) {
+     		CTBBusinessException rde = new CTBBusinessException("TestSessionStatusImpl: updateDoNotScore: " + se.getMessage());
+     		rde.setStackTrace(se.getStackTrace());
+ 	        throw rde;
+ 	    }
+     }
+     
+     /**
+      * Retrieves a list of test sessions created at and below the specified org node
+ 	 * @param userName - identifies the user
+      * @param orgNodeId - identifies the org node
+ 	 * @return TestSessionData
+ 	 * @throws com.ctb.exception.CTBBusinessException
+      * @common:operation
+      */
+     public TestSessionData getTestSessionsForStudentScoring(String userName, Integer userId, Integer orgNodeId) throws CTBBusinessException
+     {
+    	 validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForStudentScoring");
+         try {
+             TestSessionData tsd = new TestSessionData();
+             Integer pageSize = null;
+             TestSession [] sessions = testAdmin.getTestAdminsForStudentScoring(userId, orgNodeId);
+             tsd.setTestSessions(sessions, pageSize);
+             sessions = tsd.getTestSessions();
+             for(int i=0;i<sessions.length;i++) {
+                 if(sessions[i] != null) {
+                     TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                 }
+             }
+             
+             return tsd;
+         } catch (SQLException se) {
+             TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForStudentScoring: " + se.getMessage());
+             tae.setStackTrace(se.getStackTrace());
+             throw tae;         
+         }
+     }
+     
+     public TestSessionData getCurrentFutureTestAdminsForOrgNode(String userName, Integer userId, Integer orgNodeId) throws CTBBusinessException
+     {
+         validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForOrgNode");
+         try {
+             TestSessionData tsd = new TestSessionData();
+             Integer pageSize = null;
+             TestSession [] sessions = testAdmin.getCurrentFutureTestAdminsForOrgNode(orgNodeId, userId);
+             tsd.setTestSessions(sessions, pageSize);
+
+             sessions = tsd.getTestSessions();
+             for(int i=0;i<sessions.length;i++) {
+                 if(sessions[i] != null) {
+                 	sessions[i].setCopyable(admins.checkCopyable(userName, sessions[i].getTestAdminId()));
+                     TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                 }
+             }
+             
+             return tsd;
+         } catch (SQLException se) {
+             TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+             tae.setStackTrace(se.getStackTrace());
+             throw tae;         
+         }
+     }
+     
+     
+     public TestSessionData getCurrentFutureTestAdminsForOrgNodeWithStudentStatus(String userName, Integer userId, Integer orgNodeId,	Integer studentId) throws CTBBusinessException
+     {
+         validator.validateNode(userName, orgNodeId, "testAdmin.getTestSessionsForOrgNode");
+         try {
+             TestSessionData tsd = new TestSessionData();
+             Integer pageSize = null;
+
+             TestSession [] sessions = testAdmin.getCurrentFutureTestAdminsForOrgNodeWithStudentStatus(orgNodeId, userId, studentId);
+             tsd.setTestSessions(sessions, pageSize);
+             sessions = tsd.getTestSessions();
+             for(int i=0;i<sessions.length;i++) {
+                 if(sessions[i] != null) {
+                 	sessions[i].setCopyable(admins.checkCopyable(userName, sessions[i].getTestAdminId()));
+                     TestAdminStatusComputer.adjustSessionTimesToLocalTimeZone(sessions[i]);
+                 }
+             }
+             
+             return tsd;
+         } catch (SQLException se) {
+             TestAdminDataNotFoundException tae = new TestAdminDataNotFoundException("TestSessionStatusImpl: getTestSessionsForOrgNode: " + se.getMessage());
+             tae.setStackTrace(se.getStackTrace());
+             throw tae;         
+         }
+     }
+     
+     public List getInvalidationReasonList() throws CTBBusinessException {
+    	 String [] ivrcStr = null;
+    	 List<String> ivrcList = null;
+    	 try{
+    		 ivrcStr= roster.getInvalidReasonCodeList();
+    		 if(ivrcStr != null){
+    			 ivrcList = new ArrayList<String>();
+	    		 for (int i = 0; i < ivrcStr.length; i++) {
+	    			 ivrcList.add(ivrcStr[i]);
+	    		 	}
+    		 	}
+			} catch(SQLException se) {
+				se.printStackTrace();	
+				}
+		return ivrcList;
+     }
+
+     public List<String> getRosterFormList(String testAdminId) throws CTBBusinessException {
+    	 String [] rosFormListStr = null;
+    	 List<String> rosFormListList = null;
+    	 try{
+    		 rosFormListStr= roster.getRosterFormList(testAdminId);
+    		 if(rosFormListStr != null){
+    			 rosFormListList = new ArrayList<String>();
+	    		 for (int i = 0; i < rosFormListStr.length; i++) {
+	    			 rosFormListList.add(rosFormListStr[i]);
+	    		 	}
+    		 	}
+			} catch(SQLException se) {
+				se.printStackTrace();	
+				}
+		return rosFormListList;
+     }
+
+     public void updateRosterForm(String userName, Integer testRosterId, String assignedForm) throws CTBBusinessException {
+//    	 validator.validate(userName, null, "testAdmin.updateRosterForm");
+    	 
+    	 Integer [] itemSetTSs = null;
+    	 Integer [] itemSetTDs = null;
+    	 
+    	 try {
+    		Integer userId = this.users.getUserIdForName(userName);
+        	Integer customerId = this.users.getCustomerIdForName(userName);
+      		this.roster.updateRosterForm(userName, testRosterId, assignedForm);
+      		
+      		// delete old form data from siss table.
+      		this.studentItemSetStatus.deleteStudentItemSetStatusesForRoster(testRosterId);
+      		
+      		// add roster with new form into siss table
+      		itemSetTSs = this.roster.getTSItemSetIds(testRosterId);
+      		if(itemSetTSs != null) {
+      			int subtestOrder = 0;
+      			for (int indx =0; indx < itemSetTSs.length; indx++) {
+      				itemSetTDs = this.studentItemSetStatus.getItemSetIdsForFormForParent(itemSetTSs[indx],assignedForm);
+      				for (int indx1 =0; indx1 < itemSetTDs.length; indx1++) {
+	      				StudentSessionStatus siss = new StudentSessionStatus();
+	      				siss.setItemSetId(itemSetTDs[indx1]);
+	      				siss.setCompletionStatus("SC");
+	      				siss.setItemSetOrder(new Integer(subtestOrder));
+	      				siss.setStartDateTime(null);
+	      				siss.setCompletionDateTime(null);
+	      				siss.setValidationStatus("VA");
+	      				siss.setAbsent("N");
+	      				siss.setTestExemptions("N");
+	      				siss.setTimeExpired("F");
+	      				siss.setValidationUpdatedBy(userId);
+	      				siss.setValidationUpdatedDateTime(new Date());
+	      				siss.setValidationUpdatedNote("");
+	                    this.studentItemSetStatus.createStudentItemSetStatusForRosterOnFormChange(customerId, siss, testRosterId);
+	                    subtestOrder++;
+      				}
+      			}
+      		}
+      		
+      	 } catch (SQLException se) {
+      		CTBBusinessException rde = new CTBBusinessException("TestSessionStatusImpl: updateRosterForm: " + se.getMessage());
+      		rde.setStackTrace(se.getStackTrace());
+  	        throw rde;
+  	    }
+     }
+     
+     public String saveStudentResponseFromClicker(ItemResponseData itemResponseData) throws CTBBusinessException{
+    	 String result = "OK";
+    	 try{
+    		 this.studentItemSetStatus.insertIntoItemResponse(itemResponseData);
+    	 }catch(SQLException se){
+    		 result = "Failed";
+    		 CTBBusinessException cbe = new CTBBusinessException("TestSessionStatusImpl: saveStudentResponseFromClicker :: "+ se.getMessage());
+    		 cbe.setStackTrace(se.getStackTrace());
+    		 //throw cbe;
+    	 }
+    	 return result;
+     }
+     
+     public boolean saveStudentResponseInBatch(ArrayList<ItemResponseData> itemResponseData) throws CTBBusinessException{
+    	 boolean result = true;
+    	 String sqlStr = "insert into item_response ( ITEM_RESPONSE_ID, ITEM_SET_ID, TEST_ROSTER_ID, RESPONSE, RESPONSE_METHOD,RESPONSE_SEQ_NUM, CREATED_DATE_TIME, ITEM_ID) values ( ?, ?, ?, ?, ?, ?, sysdate, ? )";
+    	 Connection conn = null;
+    	 PreparedStatement pstmt = null;
+    	 if(itemResponseData != null && itemResponseData.size() > 0){
+	    	 try{
+	    		 conn = this.studentItemSetStatus.getConnection();
+		    	 conn.setAutoCommit(false);
+		    	 pstmt = conn.prepareStatement(sqlStr);
+		    	 for (Iterator iterator = itemResponseData.iterator(); iterator.hasNext();) {
+					ItemResponseData ird = (ItemResponseData) iterator.next();
+					String[] sequenceString = this.studentItemSetStatus.fetchResponseId().split("\\$");
+					
+					Integer itemResponseId = Integer.parseInt(sequenceString[0]);
+					Integer responseSeqNum = Integer.parseInt(sequenceString[1]);
+
+					System.out.println("itemResponseId >> "+itemResponseId+"\tresponseSeqNum >> "+responseSeqNum);
+					
+					pstmt.setInt(1, itemResponseId);
+					pstmt.setInt(2, ird.getItemSetId());
+					pstmt.setInt(3, ird.getTestRosterId());
+					pstmt.setString(4, ird.getResponse());
+					pstmt.setString(5, ird.getResponseMethod());
+					pstmt.setInt(6, responseSeqNum);
+					pstmt.setString(7, ird.getItemId());
+					pstmt.addBatch();				
+				}    	 
+			    try {
+		    		int[]insertCount = pstmt.executeBatch();
+		    		System.out.println("No. of responses inserted = "+insertCount.length+", for subtestId = "+itemResponseData.get(0).getItemSetId());
+		         	//update siss record for the subtest
+		    		this.studentItemSetStatus.updateSissRecord(itemResponseData.get(0).getTestRosterId(), 
+		    				itemResponseData.get(0).getItemSetId());
+		    		System.out.println("Siss record is updated successfully for subtest id = "+itemResponseData.get(0).getItemSetId()+" , for roster id = "+ itemResponseData.get(0).getTestRosterId());
+		    		conn.commit();
+		    		System.out.println("\n\nSuccess: Transaction is committed....");
+		         } catch(Exception sqle) {
+		         	sqle.printStackTrace();
+		         	result = false;
+		         	// if any of the response data is not saved or siss update fails then rollback
+		         	conn.rollback(); 
+		         	System.out.println("\n\nError: Transaction is rolled back....");
+		         	//throw sqle;
+		         } finally {
+		        	 pstmt.close();
+		         	 conn.setAutoCommit(true);
+		         	//conn.close();
+		         }
+	    	 } catch(SQLException se){
+	    		 result = false;
+	    		 CTBBusinessException cbe = new CTBBusinessException("TestSessionStatusImpl: saveStudentResponseInBatch :: "+se.getMessage());
+	    		 cbe.setStackTrace(se.getStackTrace());
+	    		 throw cbe;
+	    	 }
+    	 }
+    	 
+    	 return result;
+     }
+     
+     public void updateCompletionStatusForRoster(Integer rosterId) throws CTBBusinessException{
+    	 try{
+    		 this.studentItemSetStatus.updateCompletionStatusForRoster(rosterId);
+    	 }catch(SQLException se){
+    		 CTBBusinessException cbe = new CTBBusinessException("TestSessionStatusImpl: updateCompletionStatusForRoster :: "+se.getMessage());
+    		 cbe.setStackTrace(se.getStackTrace());
+    		 throw cbe;
+    	 }
+     }
+     
+     public SubtestAccessCodeDetail[] getSubtestAccessCodeFromSession(Integer sessionId) throws CTBBusinessException{
+    	 SubtestAccessCodeDetail[] sACD = null;    	 
+    	 try{
+    		 sACD = this.testAdmin.getSessionAccessCodeDetails(sessionId);
+    	 }catch(SQLException se){
+    		 CTBBusinessException cbe = new CTBBusinessException("TestSessionStatusImpl: getSubtestAccessCodeFromSession :: "+se.getMessage());
+    		 cbe.setStackTrace(se.getStackTrace());
+    		 throw cbe;
+    	 }
+    	return sACD; 
+     }
+     
+     
+     
+     public boolean getLocatorCompletionStatus(Integer studentId , Integer testAdminId) throws CTBBusinessException{
+    	 boolean isAllLocatorCompleted = false;    	 
+    	 try{
+    		 isAllLocatorCompleted = ("T").equalsIgnoreCase(this.testAdmin.getAllLocatorCompletionStatus(studentId , testAdminId)) ? true : false ;
+    	 }catch(SQLException se){
+    		 CTBBusinessException cbe = new CTBBusinessException("TestSessionStatusImpl: getLocatorCompletionStatus :: "+se.getMessage());
+    		 cbe.setStackTrace(se.getStackTrace());
+    		 throw cbe;
+    	 }
+    	return isAllLocatorCompleted; 
+     }
+     
+     public ItemResponseAndScore[] getScoreElementsForTS(String userName,String parentItemSetId, Integer testRosterId, Integer studentId,
+			Integer testAdminId, String productType) throws com.ctb.exception.CTBBusinessException
+    {       
+    	ItemResponseAndScore[] responseDetails = null;
+        try{
+        	//get customer query string for various shelf product
+        	String customerClause = getCustomQueryString(productType);
+        	if(customerClause== null) return null; 
+        	responseDetails = itemSet.getScoreElementsForTS(parentItemSetId,testRosterId, customerClause);
+        	if(responseDetails != null){
+        		// check ext hand scoring is done or not for TASC product
+        		String crCondition = null;
+        		if("TS".equalsIgnoreCase(productType)||"TR".equalsIgnoreCase(productType)){
+					crCondition = itemSet.checkExtHandScoring(testRosterId);
+        		}
+        		//get the fact table name by product type
+        		String scoreTableName=getScoreTableName(productType);
+        		if(scoreTableName != null){
+        		ItemResponseAndScore[] scoreDetailList = reports.getObtainedScoreForItem(scoreTableName, studentId, testAdminId);
+        			//create a Map of ItemId and score
+        			Map<String, String> itemScoreMap = new HashMap<String, String>();
+        			if(scoreDetailList != null){
+	        			for(ItemResponseAndScore irs : scoreDetailList){
+	        				itemScoreMap.put(irs.getItemId(), irs.getRawScore());
+	        			}
+        			}
+        			//populate the final responseDetails
+    				for(ItemResponseAndScore res : responseDetails){
+    					String itemId = res.getItemId();
+    					if(("CR".equals(res.getItemType()) && null == res.getItemAnswerArea())
+    							|| "GR".equals(res.getItemType())){
+    						String crResponse;
+							try {
+								crResponse = readOracleClob(res.getCrResponse());
+								if("".equals(crResponse)){
+	        						res.setResponse(("CR".equals(res.getItemType()))?null:TestSessionStatusImpl.BLANK_VALUE);
+	        						res.setRawScore(TestSessionStatusImpl.BLANK_VALUE);
+	        						res.setPdfResponse("");
+	        					}else{
+	        						crResponse = java.net.URLDecoder.decode(crResponse, URL_ENCODING);
+	        						
+	        						if("GR".equals(res.getItemType())){
+	        							res.setResponse(crResponse);
+	        						}else{
+		        						String answer = removeXMLTags(crResponse);
+		        						if(null == answer){
+		        							res.setPdfResponse("");
+		        						} else {
+		        							res.setPdfResponse(answer);
+		        						}
+		        						answer = forHTML(answer);
+		        						res.setResponse(("".equals(answer))?null:answer);
+	        						}
+	        						
+	        						//set rawscore fetched from irs
+	        						if("TS".equalsIgnoreCase(productType)||"TR".equalsIgnoreCase(productType)){
+        								if(!"GR".equals(res.getItemType()) && "FALSE".equalsIgnoreCase(crCondition)){
+        									res.setRawScore(BLANK_VALUE);
+        								}else{
+        									if(itemScoreMap.containsKey(itemId)){
+		        								res.setRawScore(itemScoreMap.get(itemId));
+			            					}else{
+			            						res.setRawScore(TestSessionStatusImpl.BLANK_VALUE);
+			            					}
+        								}
+        							}else{
+		        						if(itemScoreMap.containsKey(itemId)){
+		        								res.setRawScore(itemScoreMap.get(itemId));
+		            					}else{
+		            						res.setRawScore(TestSessionStatusImpl.BLANK_VALUE);
+		            					}
+        							}
+	        					}
+							} catch (IOException se) {
+								CTBBusinessException cbe = new RosterDataNotFoundException("TestSessionStatusImpl: getScoreElementsForTS: " + se.getMessage());
+					            cbe.setStackTrace(se.getStackTrace());
+					            throw cbe; 
+							}
+    					}else{
+        					if(res.getResponse() == null || "".equals(res.getResponse())){
+        						res.setResponse(TestSessionStatusImpl.BLANK_VALUE);
+        						res.setRawScore(TestSessionStatusImpl.BLANK_VALUE);
+        					}else{
+        						if(itemScoreMap.containsKey(itemId)){
+            						res.setRawScore(itemScoreMap.get(itemId));
+            					}else{
+            						res.setRawScore(TestSessionStatusImpl.BLANK_VALUE);
+            					}
+        					}
+    					}
+    					
+    					//Arrange the content domain name -- [ Reading Informational Text: Integration of Knowledge and Ideas ] for TASC framework
+    					if("TS".equalsIgnoreCase(productType)||"TR".equalsIgnoreCase(productType)){
+    						String domainName = res.getContentDomain();
+    						if(null != domainName && domainName.contains(":")){
+    							String[] arr = domainName.split(":");
+    							String str="";
+    							for(int indx=0; indx<arr.length; indx++){
+    								if(null != arr[indx]){
+    									if(arr[indx].trim().startsWith("Reading")) domainName = arr[indx].trim();
+        								else str=str.concat(arr[indx].trim());
+    								}
+    							}
+    							domainName = domainName.concat(": "+str);
+    							res.setContentDomain(domainName);
+    						}
+    					}
+    				}
+        		}
+        	}
+            return responseDetails;                  
+        }catch(SQLException se){
+            CTBBusinessException cbe = new RosterDataNotFoundException("TestSessionStatusImpl: getScoreElementsForTS: " + se.getMessage());
+            cbe.setStackTrace(se.getStackTrace());
+            throw cbe;                
+        }        
+    }
+    
+     /**
+ 	 * Get the entries of Product Resource table to populate dynamic links of 3rd party softwares
+ 	 * @param productId
+ 	 * @return UserParentProductResource
+ 	 * @throws CTBBusinessException
+ 	 */
+ 	public UserParentProductResource[] getProductResourceEntries(Integer productId) throws CTBBusinessException{
+ 		try{
+ 			UserParentProductResource[] productResource = this.product.getProductResourceEntries(productId);
+ 			return productResource;
+ 		}catch(SQLException se){
+ 			CTBBusinessException cbe = new ProductResourceDataNotFound("TestSessionStatusImpl: getProductResourceEntries: " + se.getMessage());
+            cbe.setStackTrace(se.getStackTrace());
+            throw cbe;
+ 		}
+ 		
+ 	}
+     
+     
+    /**
+     * To append extra condition in query for different product ( Datapoint joining for Item Max Score & Test Form condition )
+     * @param productType
+     * @return
+     */
+    private String getCustomQueryString(String productType) {
+    	StringBuilder queryString = new StringBuilder();
+    	if ("TS".equalsIgnoreCase(productType)
+				|| "TR".equalsIgnoreCase(productType)){
+    		queryString.append(" AND (DP.ITEM_ID, DP.ITEM_SET_ID) IN  ((ITEM.ITEM_ID, OBJ.ITEM_SET_ID)) ");
+    		queryString.append(" AND TR.FORM_ASSIGNMENT = ISET.ITEM_SET_FORM ");
+    	} else if ("TC".equalsIgnoreCase(productType)
+				|| "LL".equalsIgnoreCase(productType)){
+    		queryString.append(" AND TR.FORM_ASSIGNMENT = ISET.ITEM_SET_FORM ");
+    		queryString.append(" AND DP.ITEM_ID = ITEM.ITEM_ID ");
+    	} else if ("TB".equalsIgnoreCase(productType)){
+    		queryString.append(" AND DP.ITEM_ID = ITEM.ITEM_ID ");
+    	} else if ("TA".equalsIgnoreCase(productType)){
+    		queryString.append(" AND DP.ITEM_ID = ITEM.ITEM_ID ");
+    		queryString.append(" AND EXISTS (SELECT 1 FROM ITEM_RESPONSE RES WHERE RES.TEST_ROSTER_ID = TR.TEST_ROSTER_ID AND RES.ITEM_SET_ID = ISET.ITEM_SET_ID AND RES.ITEM_ID = ITEM.ITEM_ID) ");
+    	}else return null;
+    	
+		return queryString.toString();
+	}
+
+	/**
+	 * Read the Clob data
+	 * @param clob
+	 * @return
+	 * @throws SQLException
+	 * @throws IOException
+	 */
+	private static String readOracleClob(Clob clob) throws SQLException, IOException {
+    	if(clob==null){
+    		return "";
+    	}
+    	// get character stream to retrieve clob data
+        Reader instream = clob.getCharacterStream();
+        StringBuffer sb = new StringBuffer();
+        // create temporary buffer for read
+        char[] buffer = new char[1024];
+
+        // length of characters read
+        int length = 0;
+
+        // fetch data
+        while ((length = instream.read(buffer)) != -1)
+        {
+            sb.append(buffer, 0, length);
+        }
+
+        // Close input stream
+        instream.close();
+
+        return sb.toString();
+    }
+	
+	/**
+	 * Remove XML tags in Constructed Responses
+	 * @param sVal
+	 * @return
+	 */
+	public static String removeXMLTags(String sVal) {
+		String CDATA = "<![CDATA[";
+		String END_CDATA = "]]>";
+		String surveyValue = "";
+		if (sVal.indexOf(CDATA) > 0
+				&& sVal.lastIndexOf(END_CDATA) > 0) {
+			surveyValue = sVal.substring(sVal.indexOf(CDATA) + 9, sVal
+					.lastIndexOf(END_CDATA));
+		}
+		return surveyValue;
+	}
+    
+    /**
+     * Get IRS item fact table name by product ID
+     * @param productType
+     * @return String 
+     */
+    private String getScoreTableName(String productType) {
+    	if(TestSessionStatusImpl.irsItemFactTableMap != null && TestSessionStatusImpl.irsItemFactTableMap.containsKey(productType)){
+    		return TestSessionStatusImpl.irsItemFactTableMap.get(productType);
+    	}
+    	return null;
+	}
+
+	
+    public ScoreDetails[]  getAllItemSetForRoster(String userName,Integer testRosterId) throws com.ctb.exception.CTBBusinessException
+    {     
+    	String productType = null;
+    	StringBuilder itemSetBuilder = new StringBuilder(); 
+    	//validator.validateRoster(userName, testRosterId, "TestSessionStatusImpl: getCompletedItemSetIdForRoster");
+    	Map<Integer, ScoreDetails> schedulableMap = new HashMap<Integer, ScoreDetails>();
+        try{
+        	ScoreDetails[] totalItemSets = itemSet.getAllItemSetForRoster(testRosterId);
+        	if(null != totalItemSets){
+        		for(ScoreDetails sd : totalItemSets){
+        			Integer itemSetId = sd.getItemSetId();
+        			if(!schedulableMap.containsKey(itemSetId)){
+        				if(null == productType)productType = sd.getProductType();
+        				ScoreDetails subtest = new ScoreDetails(sd
+								.getItemSetId(), sd.getItemSetName(), sd
+								.getItemSetType(), sd.getItemSetOrder(), sd
+								.getItemSetLevel(), sd.getAccessCode(), sd
+								.getTestSessionName(), sd.getTestName(), sd
+								.getProductType());
+        				List<DeliveryUnitElement> deliverableUnit = new ArrayList<DeliveryUnitElement>();
+        				deliverableUnit.add(new DeliveryUnitElement(sd.getItemSetIdTD(), sd.getItemSetNameTD(), sd.getCompletionStatusTD()));
+        				subtest.setDeliverableUnit(deliverableUnit);
+        				schedulableMap.put(itemSetId, subtest);
+        			}else{
+        				schedulableMap.get(itemSetId).getDeliverableUnit().add(
+								new DeliveryUnitElement(sd.getItemSetIdTD(), sd
+										.getItemSetNameTD(), sd
+										.getCompletionStatusTD()));
+        				
+        			}
+        		}
+        	}
+        	ScoreDetails[] scoreDetails = schedulableMap.values().toArray(new ScoreDetails[schedulableMap.values().size()]);
+			if(null != productType && "TB".equalsIgnoreCase(productType))
+				getSubtestIdsForTABE(itemSetBuilder, scoreDetails, testRosterId); // TABE Locator completion logic call
+			else {
+				for (int i = 0; i < scoreDetails.length; i++) {
+					ScoreDetails sd = scoreDetails[i];
+					if (itemSetBuilder.length() > 0)
+						itemSetBuilder.append(",");
+					itemSetBuilder.append(sd.getItemSetId());
+				}
+			}
+			scoreDetails[0].setTestIds(itemSetBuilder.toString());
+            return scoreDetails;
+        }catch(SQLException se){
+            CTBBusinessException cbe = new RosterDataNotFoundException("TestSessionStatusImpl: getCompletedItemSetIdForRoster: " + se.getMessage());
+            cbe.setStackTrace(se.getStackTrace());
+            throw cbe;                
+        }        
+    }
+    
+    /**
+     * Build a string of comma seperated completed locator sub test id. 
+     * [ If TABE Reading Locator is completed then TABE Reading & TABE Vocabulary sub test Ids will be added to string ] 
+     * @param itemSetIds
+     * @param sds
+     * @param testRosterId
+     */
+	private void getSubtestIdsForTABE(StringBuilder itemSetIds, ScoreDetails[] sds, Integer testRosterId) {
+		String subtestName = null;
+		boolean hasLocator = false;
+		boolean readingLocator = false;
+		boolean computationLocator = false;
+		boolean appliedLocator = false;
+		boolean languageLocator = false;
+		final String READING = "READING";
+		final String LANGUAGE = "LANGUAGE";
+		final String COMPUTATION = "COMPUTATION";
+		final String APPLIED = "APPLIED";
+		final String VOCABULARY = "VOCABULARY";
+		final String MECHANICS = "MECHANICS";
+		
+		Map<String, String> locatorMap = new HashMap<String, String>();
+		Arrays.sort(sds, new OrderByItemSetOrder());
+		for(ScoreDetails sd : sds){
+			subtestName = sd.getItemSetName();
+			
+			if(null != subtestName && subtestName.toUpperCase().contains("LOCATOR")){
+				append(itemSetIds, sd.getItemSetId());
+				hasLocator = true;
+				List<DeliveryUnitElement> locatorSubtestTD = sd.getDeliverableUnit();
+				for(DeliveryUnitElement de : locatorSubtestTD){
+					String locatorSubtestName = de.getItemSetNameTD().toUpperCase();
+					if(locatorSubtestName.contains(READING)){
+						locatorMap.put(READING, READING);
+						if("CO".equalsIgnoreCase(de.getCompletionStatus()))readingLocator = true;
+					}
+					else if(locatorSubtestName.contains(LANGUAGE)){
+						locatorMap.put(LANGUAGE, LANGUAGE);
+						if("CO".equalsIgnoreCase(de.getCompletionStatus()))languageLocator = true;
+					}
+					else if(locatorSubtestName.contains(COMPUTATION)){
+						locatorMap.put(COMPUTATION, COMPUTATION);
+						if("CO".equalsIgnoreCase(de.getCompletionStatus()))computationLocator = true;
+					}
+					else if(locatorSubtestName.contains(APPLIED)){
+						locatorMap.put(APPLIED, APPLIED);
+						if("CO".equalsIgnoreCase(de.getCompletionStatus()))appliedLocator = true;
+					}
+				}
+			}else{
+				if(hasLocator){
+					if(sd.getItemSetName().toUpperCase().contains(READING)|| sd.getItemSetName().toUpperCase().contains(VOCABULARY)){
+						if((locatorMap.containsKey(READING) && readingLocator))
+							append(itemSetIds, sd.getItemSetId());
+						else if (!locatorMap.containsKey(READING))
+							append(itemSetIds, sd.getItemSetId());
+					}
+					else if(sd.getItemSetName().toUpperCase().contains(LANGUAGE) || sd.getItemSetName().toUpperCase().contains(MECHANICS)){
+						if((locatorMap.containsKey(LANGUAGE) && languageLocator))
+							append(itemSetIds, sd.getItemSetId());
+						else if (!locatorMap.containsKey(LANGUAGE))
+							append(itemSetIds, sd.getItemSetId());
+					}
+					else if(computationLocator && sd.getItemSetName().toUpperCase().contains(COMPUTATION)){
+						if((locatorMap.containsKey(COMPUTATION) && computationLocator))
+							append(itemSetIds, sd.getItemSetId());
+						else if (!locatorMap.containsKey(COMPUTATION))
+							append(itemSetIds, sd.getItemSetId());
+					}
+					else if(appliedLocator && sd.getItemSetName().toUpperCase().contains(APPLIED)){
+						if((locatorMap.containsKey(APPLIED) && appliedLocator))
+							append(itemSetIds, sd.getItemSetId());
+						else if (!locatorMap.containsKey(APPLIED))
+							append(itemSetIds, sd.getItemSetId());
+					}
+				}else{
+					append(itemSetIds, sd.getItemSetId());
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Append to stringbuilder with comma separated
+	 * @param itemSetIds
+	 * @param itemSetID
+	 */
+	private void append(StringBuilder itemSetIds, Integer itemSetID){
+		if(itemSetIds.length()>0)itemSetIds.append(",");
+		itemSetIds.append(itemSetID);
+	}
+	
+	/**
+    Escape characters for text appearing in HTML markup.
+    
+    This method exists as a defence against Cross Site Scripting (XSS) hacks.
+    The idea is to neutralize control characters commonly used by scripts, such that
+    they will not be executed by the browser. This is done by replacing the control
+    characters with their escaped equivalents.
+    
+    <P>The following characters are replaced with corresponding 
+    HTML character entities :
+    <table border='1' cellpadding='3' cellspacing='0'>
+    <tr><th> Character </th><th>Replacement</th></tr>
+    <tr><td> < </td><td> &lt; </td></tr>
+    <tr><td> > </td><td> &gt; </td></tr>
+    <tr><td> & </td><td> &amp; </td></tr>
+    <tr><td> " </td><td> &quot;</td></tr>
+    <tr><td> \t </td><td> &#009;</td></tr>
+    <tr><td> ! </td><td> &#033;</td></tr>
+    <tr><td> # </td><td> &#035;</td></tr>
+    <tr><td> $ </td><td> &#036;</td></tr>
+    <tr><td> % </td><td> &#037;</td></tr>
+    <tr><td> ' </td><td> &#039;</td></tr>
+    <tr><td> ( </td><td> &#040;</td></tr> 
+    <tr><td> ) </td><td> &#041;</td></tr>
+    <tr><td> * </td><td> &#042;</td></tr>
+    <tr><td> + </td><td> &#043; </td></tr>
+    <tr><td> , </td><td> &#044; </td></tr>
+    <tr><td> - </td><td> &#045; </td></tr>
+    <tr><td> . </td><td> &#046; </td></tr>
+    <tr><td> / </td><td> &#047; </td></tr>
+    <tr><td> : </td><td> &#058;</td></tr>
+    <tr><td> ; </td><td> &#059;</td></tr>
+    <tr><td> = </td><td> &#061;</td></tr>
+    <tr><td> ? </td><td> &#063;</td></tr>
+    <tr><td> @ </td><td> &#064;</td></tr>
+    <tr><td> [ </td><td> &#091;</td></tr>
+    <tr><td> \ </td><td> &#092;</td></tr>
+    <tr><td> ] </td><td> &#093;</td></tr>
+    <tr><td> ^ </td><td> &#094;</td></tr>
+    <tr><td> _ </td><td> &#095;</td></tr>
+    <tr><td> ` </td><td> &#096;</td></tr>
+    <tr><td> { </td><td> &#123;</td></tr>
+    <tr><td> | </td><td> &#124;</td></tr>
+    <tr><td> } </td><td> &#125;</td></tr>
+    <tr><td> ~ </td><td> &#126;</td></tr>
+    </table>
+    
+    <P>Note that JSTL's {@code <c:out>} escapes <em>only the first 
+    five</em> of the above characters.
+   */
+   public static String forHTML(String aText) {
+		final StringBuilder result = new StringBuilder();
+		final StringCharacterIterator iterator = new StringCharacterIterator(
+				aText);
+		char character = iterator.current();
+		while (character != CharacterIterator.DONE) {
+			if (character == '<') {
+				result.append("&lt;");
+			} else if (character == '>') {
+				result.append("&gt;");
+			} else if (character == '&') {
+				result.append("&amp;");
+			} else if (character == '\"') {
+				result.append("&quot;");
+			} else if (character == '\t') {
+				addCharEntity(9, result);
+			} else if (character == '!') {
+				addCharEntity(33, result);
+			} else if (character == '#') {
+				addCharEntity(35, result);
+			} else if (character == '$') {
+				addCharEntity(36, result);
+			} else if (character == '%') {
+				addCharEntity(37, result);
+			} else if (character == '\'') {
+				addCharEntity(39, result);
+			} else if (character == '(') {
+				addCharEntity(40, result);
+			} else if (character == ')') {
+				addCharEntity(41, result);
+			} else if (character == '*') {
+				addCharEntity(42, result);
+			} else if (character == '+') {
+				addCharEntity(43, result);
+			} else if (character == ',') {
+				addCharEntity(44, result);
+			} else if (character == '-') {
+				addCharEntity(45, result);
+			} else if (character == '.') {
+				addCharEntity(46, result);
+			} else if (character == '/') {
+				addCharEntity(47, result);
+			} else if (character == ':') {
+				addCharEntity(58, result);
+			} else if (character == ';') {
+				addCharEntity(59, result);
+			} else if (character == '=') {
+				addCharEntity(61, result);
+			} else if (character == '?') {
+				addCharEntity(63, result);
+			} else if (character == '@') {
+				addCharEntity(64, result);
+			} else if (character == '[') {
+				addCharEntity(91, result);
+			} else if (character == '\\') {
+				addCharEntity(92, result);
+			} else if (character == ']') {
+				addCharEntity(93, result);
+			} else if (character == '^') {
+				addCharEntity(94, result);
+			} else if (character == '_') {
+				addCharEntity(95, result);
+			} else if (character == '`') {
+				addCharEntity(96, result);
+			} else if (character == '{') {
+				addCharEntity(123, result);
+			} else if (character == '|') {
+				addCharEntity(124, result);
+			} else if (character == '}') {
+				addCharEntity(125, result);
+			} else if (character == '~') {
+				addCharEntity(126, result);
+			} else {
+				// the char is not a special one
+				// add it to the result as is
+				result.append(character);
+			}
+			character = iterator.next();
+		}
+		return result.toString();
+	}
+   
+   private static void addCharEntity(Integer aIdx, StringBuilder aBuilder) {
+		String padding = "";
+		if (aIdx <= 9) {
+			padding = "00";
+		} else if (aIdx <= 99) {
+			padding = "0";
+		} else {
+			//no prefix
+		}
+		String number = padding + aIdx.toString();
+		aBuilder.append("&#" + number + ";");
+   }
+	
+     
+} 
